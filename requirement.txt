@@ -1,0 +1,8 @@
+fastapi==0.100.0
+torch
+pydantic
+pickle
+uvicorn
+scikit-learn
+joblib
+pandas

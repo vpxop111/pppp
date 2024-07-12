@@ -11,7 +11,7 @@ app = FastAPI()
 
 # Load the model and vectorizer
 model_path = 'scams.pth'
-vectorizer_path = 'vect.pkl'
+vectorizer_path = 'vectt.pkl'
 
 # Define the RNN model class
 class SMSRNN(nn.Module):
@@ -96,4 +96,4 @@ async def predict(message: Message = Body(...)):
 
 if __name__ == '__main__':
     import uvicorn
-    uvicorn.run(app, host='0.0.0.0', port=5001)
+    uvicorn.run(app, host='0.0.0.0', port=5222)
