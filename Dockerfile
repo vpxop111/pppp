@@ -1,17 +1,19 @@
-# Use the official Python image from the Docker Hub
-FROM python:3.9
+# Dockerfile
 
-# Set the working directory in the container
+# Use the official Python image from the Docker Hub
+FROM python:3.9-slim
+
+# Set the working directory inside the container
 WORKDIR /app
 
-# Copy the requirements file into the container
-COPY requirements.txt .
+# Copy over the requirements file to install Python dependencies
+COPY requirements.txt requirements.txt
 
-# Install the dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install dependencies using pip
+RUN pip install -r requirements.txt
 
-# Copy the rest of the working directory contents into the container
+# Copy the entire current directory into the container's working directory
 COPY . .
 
-# Command to run the FastAPI application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5000"]
+# Command to run the FastAPI application with Hypercorn on port 5000
+CMD ["hypercorn", "main:app", "--bind", "0.0.0.0:5000"]

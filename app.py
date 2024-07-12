@@ -1,3 +1,5 @@
+# main.py
+
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -11,7 +13,7 @@ app = FastAPI()
 
 # Load the model and vectorizer
 model_path = 'scams.pth'
-vectorizer_path = 'vectt.pkl'
+vectorizer_path = 'vect.pkl'
 
 # Define the RNN model class
 class SMSRNN(nn.Module):
@@ -34,7 +36,7 @@ class SMSRNN(nn.Module):
 def load_model_and_vectorizer(model_path, vectorizer_path):
     # Load the model
     model = SMSRNN(input_size, hidden_size, num_layers)
-    model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
+    model.load_state_dict(torch.load(model_path))
     model.eval()
 
     # Load the vectorizer
@@ -94,6 +96,12 @@ async def predict(message: Message = Body(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# For Docker deployment
 if __name__ == '__main__':
     import uvicorn
-    uvicorn.run(app, host='0.0.0.0', port=5000)  # Railway uses port 5000 by default
+    import os
+    from hypercorn.config import Config
+
+    config = Config()
+    config.bind = ["0.0.0.0:5000"]
+    uvicorn.run(app, config=config)
