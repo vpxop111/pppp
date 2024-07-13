@@ -1,21 +1,23 @@
-# main.py
-
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 import torch
 import torch.nn as nn
-import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer
 import pickle
+from pydantic import BaseModel
+import os
 
 app = FastAPI()
 
-# Load the model and vectorizer
-model_path = 'scams.pth'
-vectorizer_path = 'vect.pkl'
+# CORS setup
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Change this to specific domains in production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# Define the RNN model class
+# Define the RNN model
 class SMSRNN(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers):
         super(SMSRNN, self).__init__()
@@ -33,75 +35,33 @@ class SMSRNN(nn.Module):
         out = torch.sigmoid(self.fc(out))
         return out
 
-def load_model_and_vectorizer(model_path, vectorizer_path):
-    # Load the model
-    model = SMSRNN(input_size, hidden_size, num_layers)
-    model.load_state_dict(torch.load(model_path))
-    model.eval()
-
-    # Load the vectorizer
-    with open(vectorizer_path, 'rb') as f:
+# Load vectorizer and model
+try:
+    with open("vectt.pkl", "rb") as f:
         vectorizer = pickle.load(f)
-
-    return model, vectorizer
-
-# Global variables
-input_size = 5000  # Assuming TF-IDF vectorizer with max_features=5000
-hidden_size = 128
-num_layers = 2
-
-# Load model and vectorizer
-model, vectorizer = load_model_and_vectorizer(model_path, vectorizer_path)
-
-# Prediction functions
-def preprocess_message(message, vectorizer):
-    system_message = f"System: This message needs to be classified as scam or ham. Message: {message}"
-    message_vectorized = vectorizer.transform([system_message])
-    message_tensor = torch.tensor(message_vectorized.toarray(), dtype=torch.float32).unsqueeze(1)
-    return message_tensor
-
-def predict_message(model, message_tensor):
+    model = SMSRNN(input_size=5000, hidden_size=128, num_layers=2)
+    model.load_state_dict(torch.load("scams.pth", map_location=torch.device('cpu')))
     model.eval()
-    with torch.no_grad():
-        output = model(message_tensor)
-        prediction = (output > 0.5).float().item()
-    return prediction
+except Exception as e:
+    print(f"Error loading files: {e}")
+    raise HTTPException(status_code=500, detail="Error loading model or data files")
 
 class Message(BaseModel):
     message: str
 
-# CORS setup
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Adjust this to specific domains in production
-    allow_credentials=True,
-    allow_methods=["POST"],
-    allow_headers=["*"],
-)
-
-@app.post('/predict')
-async def predict(message: Message = Body(...)):
+@app.post("/predict")
+async def predict(message: Message):
     try:
-        # Preprocess the message
-        message_tensor = preprocess_message(message.message, vectorizer)
-
-        # Predict using the model
-        prediction = predict_message(model, message_tensor)
-
-        # Interpret prediction
-        result = 'scam' if prediction == 1 else 'ham'
-
-        # Return JSON response
-        return {'message': message.message, 'predicted_result': result}
+        transformed_message = vectorizer.transform([message.message]).toarray()
+        tensor_data = torch.tensor(transformed_message, dtype=torch.float32).unsqueeze(1)
+        output = model(tensor_data)
+        prediction = (output.squeeze().item() > 0.5)
+        result = "scam" if prediction else "not scam"
+        return {"prediction": result}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error during prediction: {e}")
+        raise HTTPException(status_code=500, detail="Prediction error")
 
-# For Docker deployment
-if __name__ == '__main__':
+if __name__ == "__main__":
     import uvicorn
-    import os
-    from hypercorn.config import Config
-
-    config = Config()
-    config.bind = ["0.0.0.0:5000"]
-    uvicorn.run(app, config=config)
+    uvicorn.run(app, host="0.0.0.0", port=7860)

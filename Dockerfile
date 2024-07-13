@@ -1,19 +1,16 @@
-# Dockerfile
+# read the doc: https://huggingface.co/docs/hub/spaces-sdks-docker
+# you will also find guides on how best to write your Dockerfile
 
-# Use the official Python image from the Docker Hub
-FROM python:3.9-slim
+FROM python:3.9
 
-# Set the working directory inside the container
+RUN useradd -m -u 1000 user
+USER user
+ENV PATH="/home/user/.local/bin:$PATH"
+
 WORKDIR /app
 
-# Copy over the requirements file to install Python dependencies
-COPY requirements.txt requirements.txt
+COPY --chown=user ./requirements.txt requirements.txt
+RUN pip install --no-cache-dir --upgrade -r requirements.txt
 
-# Install dependencies using pip
-RUN pip install -r requirements.txt
-
-# Copy the entire current directory into the container's working directory
-COPY . .
-
-# Command to run the FastAPI application with Hypercorn on port 5000
-CMD ["hypercorn", "main:app", "--bind", "0.0.0.0:5000"]
+COPY --chown=user . /app
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860"]
