@@ -3,15 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import torch
 import torch.nn as nn
-import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer
 import pickle
 
 app = FastAPI()
 
 # Load the model and vectorizer
 model_path = 'scams.pth'
-vectorizer_path = 'vectt.pkl'
+vectorizer_path = 'vect.pkl'
 
 # Define the RNN model class
 class SMSRNN(nn.Module):
