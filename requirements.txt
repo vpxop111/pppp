@@ -1,8 +1,6 @@
-textblob
 fastapi
-uvicorn
-hypercorn==0.14.4
 torch
-scikit-learn
 pandas
+scikit-learn
 pydantic
+uvicorn
