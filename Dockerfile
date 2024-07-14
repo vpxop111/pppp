@@ -16,5 +16,11 @@ COPY . .
 # Expose the port FastAPI runs on
 EXPOSE 8000
 
+# Create a new user and set permissions
+RUN useradd -m abhishek && chown -R abhishek:abhishek /app
+
+# Switch to the new user
+USER abhishek
+
 # Command to run the application
 CMD ["hypercorn", "main:app", "--bind", "0.0.0.0:8000"]
