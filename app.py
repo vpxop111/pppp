@@ -9,7 +9,7 @@ app = FastAPI()
 
 # Load the model and vectorizer
 model_path = 'scams.pth'
-vectorizer_path = 'vect.pkl'
+vectorizer_path = 'vectt.pkl'
 
 # Define the RNN model class
 class SMSRNN(nn.Module):
