@@ -4,7 +4,10 @@ from pydantic import BaseModel
 import torch
 import torch.nn as nn
 import pickle
+import warnings
+from sklearn.exceptions import InconsistentVersionWarning
 
+warnings.filterwarnings("ignore", category=InconsistentVersionWarning)
 app = FastAPI()
 
 # Load the model and vectorizer
