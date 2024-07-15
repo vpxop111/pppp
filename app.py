@@ -6,12 +6,18 @@ import torch.nn as nn
 import pickle
 import warnings
 from sklearn.exceptions import InconsistentVersionWarning
+import logging
 
+# Suppress InconsistentVersionWarning
 warnings.filterwarnings("ignore", category=InconsistentVersionWarning)
+
+# Configure logging
+logging.getLogger("uvicorn").setLevel(logging.WARNING)
+
 app = FastAPI()
 
 # Load the model and vectorizer
-model_path = 'scams.pth'
+model_pat = 'scams.pth'
 vectorizer_path = 'vectt.pkl'
 
 # Define the RNN model class
@@ -32,10 +38,10 @@ class SMSRNN(nn.Module):
         out = torch.sigmoid(self.fc(out))
         return out
 
-def load_model_and_vectorizer(model_path, vectorizer_path):
+def load_model_and_vectorizer(model_pat, vectorizer_path):
     # Load the model
     model = SMSRNN(input_size, hidden_size, num_layers)
-    model.load_state_dict(torch.load(model_path))
+    model.load_state_dict(torch.load(model_pat))
     model.eval()
 
     # Load the vectorizer
@@ -50,7 +56,7 @@ hidden_size = 128
 num_layers = 2
 
 # Load model and vectorizer
-model, vectorizer = load_model_and_vectorizer(model_path, vectorizer_path)
+model, vectorizer = load_model_and_vectorizer(model_pat, vectorizer_path)
 
 # Prediction functions
 def preprocess_message(message, vectorizer):
@@ -91,10 +97,7 @@ async def predict(message: Message = Body(...)):
         result = 'scam' if prediction == 1 else 'ham'
 
         # Return JSON response
+      
         return {'message': message.message, 'predicted_result': result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-if __name__ == '__main__':
-    import uvicorn
-    uvicorn.run(app, host='0.0.0.0', port=8000)
