@@ -1,20 +1,13 @@
-# Use the official Python image
 FROM python:3.9
 
-# Set the working directory
+RUN useradd -m -u 1000 user
+USER user
+ENV PATH="/home/user/.local/bin:$PATH"
+
 WORKDIR /app
 
-# Copy requirements.txt first to leverage Docker cache
-COPY requirements.txt .
+COPY --chown=user ./requirements.txt requirements.txt
+RUN pip install --no-cache-dir --upgrade -r requirements.txt
 
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy the rest of the application code
-COPY . .
-
-# Expose the port FastAPI runs on
-EXPOSE 8002
-
-# Command to run the application
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "$PORT", "8002"]
+COPY --chown=user . /app
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8002"]
