@@ -8,6 +8,7 @@ import warnings
 from sklearn.exceptions import InconsistentVersionWarning
 
 warnings.filterwarnings("ignore", category=InconsistentVersionWarning)
+
 app = FastAPI()
 
 # Load the model and vectorizer
@@ -34,7 +35,7 @@ class SMSRNN(nn.Module):
 
 def load_model_and_vectorizer(model_path, vectorizer_path):
     # Load the model
-    model = SMSRNN(input_size, hidden_size, num_layers)
+    model = SMSRNN(input_size=5000, hidden_size=128, num_layers=2)
     model.load_state_dict(torch.load(model_path))
     model.eval()
 
@@ -43,11 +44,6 @@ def load_model_and_vectorizer(model_path, vectorizer_path):
         vectorizer = pickle.load(f)
 
     return model, vectorizer
-
-# Global variables
-input_size = 5000  # Assuming TF-IDF vectorizer with max_features=5000
-hidden_size = 128
-num_layers = 2
 
 # Load model and vectorizer
 model, vectorizer = load_model_and_vectorizer(model_path, vectorizer_path)
@@ -97,4 +93,4 @@ async def predict(message: Message = Body(...)):
 
 if __name__ == '__main__':
     import uvicorn
-    uvicorn.run(app, host='0.0.0.0', port=8080)
+    uvicorn.run(app, host='0.0.0.0', port=8000)
