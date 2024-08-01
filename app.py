@@ -12,8 +12,8 @@ warnings.filterwarnings("ignore", category=InconsistentVersionWarning)
 app = FastAPI()
 
 # Load the model and vectorizer
-model_path = 'scams.pth'
-vectorizer_path = 'vectt.pkl'
+model_path = 'scam1.pth'
+vectorizer_path = 'vect1.pkl'
 
 # Define the RNN model class
 class SMSRNN(nn.Module):
