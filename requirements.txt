@@ -5,3 +5,4 @@ cairosvg
 pillow
 openai
 python-dotenv
+gunicorn
