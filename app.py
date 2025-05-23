@@ -724,5 +724,14 @@ def chat_assistant():
         return jsonify({"error": error_msg}), 500
 
 if __name__ == '__main__':
-    logger.info("Starting Flask application on port 5001")
-    app.run(debug=True, port=5001)
+    # Get port from environment variable (Render sets PORT=8000)
+    port = int(os.getenv('PORT', 5001))
+    
+    # Use 0.0.0.0 for production (Render) and 127.0.0.1 for local development
+    host = '0.0.0.0' if os.getenv('PORT') else '127.0.0.1'
+    
+    # Disable debug mode in production
+    debug = not bool(os.getenv('PORT'))
+    
+    logger.info(f"Starting Flask application on {host}:{port} (debug={debug})")
+    app.run(host=host, port=port, debug=debug)
