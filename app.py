@@ -12,12 +12,29 @@ from PIL import Image
 import openai
 import uuid
 from datetime import datetime
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+
+# Configure CORS with specific settings
+CORS(app, 
+     origins=['http://localhost:3000', 'http://127.0.0.1:3000', 'https://pppp-351z.onrender.com'],
+     methods=['GET', 'POST', 'OPTIONS'],
+     allow_headers=['Content-Type', 'Authorization'],
+     supports_credentials=True)
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('app.log'),
+        logging.StreamHandler()
+    ]
+)
 logger = logging.getLogger(__name__)
 
 # Directory setup
@@ -43,10 +60,13 @@ OPENAI_CHAT_ENDPOINT = f"{OPENAI_API_BASE}/chat/completions"
 PRE_ENHANCER_MODEL = "gpt-4o-mini"
 PROMPT_ENHANCER_MODEL = "gpt-4o-mini"
 GPT_IMAGE_MODEL = "gpt-image-1"
-SVG_GENERATOR_MODEL = "gpt-4.1"
+SVG_GENERATOR_MODEL = "gpt-4.1-mini"
+CHAT_ASSISTANT_MODEL = "gpt-4o-mini"
 
 def pre_enhance_prompt(user_input):
     """Initial enhancement of user query using standard GPT-4o mini"""
+    logger.info(f"Pre-enhancing prompt: {user_input[:100]}...")
+    
     url = OPENAI_CHAT_ENDPOINT
     headers = {
         "Content-Type": "application/json",
@@ -111,9 +131,13 @@ Examples for Testimonial Designs: -
 
     if response.status_code != 200:
         logger.error(f"OpenAI API error: {response_data}")
+        logger.error(f"Response status code: {response.status_code}")
+        logger.error(f"Response headers: {response.headers}")
         raise Exception(f"OpenAI API error: {response_data.get('error', {}).get('message', 'Unknown error')}")
 
-    return response_data["choices"][0]["message"]["content"]
+    enhanced_prompt = response_data["choices"][0]["message"]["content"]
+    logger.info(f"Successfully enhanced prompt. Result: {enhanced_prompt[:100]}...")
+    return enhanced_prompt
 
 def enhance_prompt_with_chat(user_input):
     """Enhance user prompt using Chat Completions API"""
@@ -193,12 +217,16 @@ def generate_image_with_gpt(enhanced_prompt):
 
 def generate_svg_from_image(image_base64, enhanced_prompt):
     """Generate SVG code using GPT-4.1 based on image and prompt"""
+    logger.info("Starting SVG generation from image")
+    logger.info(f"Enhanced prompt length: {len(enhanced_prompt)}")
+    
     url = "https://api.openai.com/v1/chat/completions"
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {OPENAI_API_KEY_SVG}"
     }
 
+    # Restored original system prompt
     system_prompt = """You are an expert SVG code generator. Your task is to create precise, clean, and optimized SVG code that exactly matches the provided image. Follow these guidelines:
 
 1. Create SVG with dimensions 1080x1080 pixels
@@ -243,7 +271,7 @@ Return ONLY the SVG code without any explanations or comments."""
                 "content": message_content
             }
         ],
-        "temperature": 1,
+        "temperature": 1,  # Restored original temperature
         "max_tokens": 4000
     }
 
@@ -252,21 +280,30 @@ Return ONLY the SVG code without any explanations or comments."""
     response_data = response.json()
 
     if response.status_code != 200:
-        logger.error(f"OpenAI API error: {response_data}")
+        logger.error(f"OpenAI API error in SVG generation: {response_data}")
+        logger.error(f"Response status code: {response.status_code}")
         raise Exception(f"OpenAI API error: {response_data.get('error', {}).get('message', 'Unknown error')}")
 
     svg_content = response_data["choices"][0]["message"]["content"]
+    logger.info(f"Successfully generated SVG code. Length: {len(svg_content)}")
     
     # Extract SVG code
     svg_pattern = r'<svg.*?<\/svg>'
     svg_matches = re.search(svg_pattern, svg_content, re.DOTALL)
     
     if svg_matches:
-        return svg_matches.group(0)
-    return svg_content
+        logger.info("Successfully extracted SVG code from response")
+        raw_svg = svg_matches.group(0)
+        # Use original clean function with minimal changes
+        formatted_svg = clean_svg_code_original(raw_svg)
+        return formatted_svg
+    
+    logger.warning("Could not extract SVG pattern, attempting to clean raw content")
+    formatted_svg = clean_svg_code_original(svg_content)
+    return formatted_svg
 
-def clean_svg_code(svg_code):
-    """Clean and validate SVG code"""
+def clean_svg_code_original(svg_code):
+    """Original clean and validate SVG code function"""
     try:
         from xml.dom.minidom import parseString
         from xml.parsers.expat import ExpatError
@@ -278,12 +315,13 @@ def clean_svg_code(svg_code):
             # Get the SVG element
             svg_element = doc.documentElement
             
-            # Ensure viewBox exists
+            # Ensure viewBox exists (minimal changes from original)
             if not svg_element.hasAttribute('viewBox'):
                 svg_element.setAttribute('viewBox', '0 0 1080 1080')
             
             # Convert back to string with pretty printing
             cleaned_svg = doc.toxml()
+            logger.info("SVG cleaned successfully")
             return cleaned_svg
             
         except ExpatError:
@@ -361,6 +399,7 @@ def serve_image(filename):
 
 @app.route('/api/generate-svg', methods=['POST'])
 def generate_svg():
+    """Original SVG generator endpoint with high quality"""
     try:
         data = request.json
         user_input = data.get('prompt', '')
@@ -412,10 +451,278 @@ def generate_svg():
     except Exception as e:
         logger.error(f"Error in generate_svg: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+def chat_with_ai_about_design(messages, current_svg=None):
+    """Enhanced conversational AI that can discuss and modify designs"""
+    logger.info("Starting conversational AI interaction")
     
+    url = OPENAI_CHAT_ENDPOINT
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
+    }
+
+    # Create system prompt that includes SVG knowledge
+    system_prompt = """You are an expert AI design assistant with deep knowledge of SVG creation and manipulation. You can:
+
+1. Create new designs from scratch
+2. Explain existing SVG designs in detail
+3. Modify existing designs based on user feedback
+4. Provide design suggestions and improvements
+5. Discuss design principles, colors, typography, and layout
+
+When discussing SVGs, you understand:
+- SVG elements like <rect>, <circle>, <path>, <text>, <g>
+- Attributes like fill, stroke, viewBox, transform
+- Design principles like color theory, typography, layout
+- How to make designs accessible and responsive
+
+Guidelines:
+- Be conversational and helpful
+- Explain technical concepts in simple terms
+- Ask clarifying questions when needed
+- Provide specific suggestions for improvements
+- When modifying designs, explain what changes you're making and why
+
+Current context: You are helping a user with their design project."""
+
+    if current_svg:
+        system_prompt += f"\n\nCurrent SVG design context:\n```svg\n{current_svg}\n```\n\nYou can reference and modify this design based on user requests."
+
+    # Prepare messages for the AI
+    ai_messages = [{"role": "system", "content": system_prompt}]
+    
+    # Add conversation history (limit to last 10 messages to manage context)
+    conversation_messages = messages[-10:] if len(messages) > 10 else messages
+    
+    for msg in conversation_messages:
+        if msg["role"] in ["user", "assistant"]:
+            # Clean SVG code blocks from previous messages to avoid clutter
+            content = msg["content"]
+            if "```svg" in content and msg["role"] == "assistant":
+                # Keep only the explanation part, not the SVG code
+                parts = content.split("```svg")
+                if len(parts) > 1:
+                    explanation = parts[0].strip()
+                    if explanation:
+                        content = explanation
+                    else:
+                        content = "I provided a design based on your request."
+            
+            ai_messages.append({
+                "role": msg["role"],
+                "content": content
+            })
+
+    payload = {
+        "model": CHAT_ASSISTANT_MODEL,
+        "messages": ai_messages,
+        "temperature": 0.7,
+        "max_tokens": 1000
+    }
+
+    logger.info(f"Calling conversational AI with {len(ai_messages)} messages")
+    response = requests.post(url, headers=headers, json=payload)
+    response_data = response.json()
+
+    if response.status_code != 200:
+        logger.error(f"Conversational AI error: {response_data}")
+        return "I'm sorry, I'm having trouble processing your request right now. Please try again."
+
+    ai_response = response_data["choices"][0]["message"]["content"]
+    logger.info(f"AI response generated: {ai_response[:100]}...")
+    return ai_response
+
+def modify_svg_with_ai(original_svg, modification_request):
+    """Use AI to modify an existing SVG based on user request"""
+    logger.info(f"Modifying SVG with request: {modification_request}")
+    
+    url = OPENAI_CHAT_ENDPOINT
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {OPENAI_API_KEY_SVG}"
+    }
+
+    system_prompt = """You are an expert SVG modifier. Given an original SVG and a modification request, create a new SVG that incorporates the requested changes.
+
+Rules:
+1. Maintain the overall structure and quality of the original design
+2. Make only the requested modifications
+3. Ensure the SVG is valid and well-formed
+4. Keep the viewBox and dimensions appropriate
+5. Maintain good design principles
+6. Return ONLY the modified SVG code, no explanations
+
+The SVG should be production-ready and properly formatted."""
+
+    payload = {
+        "model": SVG_GENERATOR_MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": system_prompt
+            },
+            {
+                "role": "user",
+                "content": f"Original SVG:\n```svg\n{original_svg}\n```\n\nModification request: {modification_request}\n\nPlease provide the modified SVG:"
+            }
+        ],
+        "temperature": 0.3,
+        "max_tokens": 2000
+    }
+
+    logger.info("Calling AI for SVG modification")
+    response = requests.post(url, headers=headers, json=payload)
+    response_data = response.json()
+
+    if response.status_code != 200:
+        logger.error(f"SVG modification error: {response_data}")
+        return None
+
+    modified_content = response_data["choices"][0]["message"]["content"]
+    
+    # Extract SVG code
+    svg_pattern = r'<svg.*?<\/svg>'
+    svg_matches = re.search(svg_pattern, modified_content, re.DOTALL)
+    
+    if svg_matches:
+        logger.info("Successfully modified SVG")
+        return svg_matches.group(0)
+    
+    logger.warning("Could not extract modified SVG, returning original")
+    return original_svg
+
+@app.route('/api/chat-assistant', methods=['POST'])
+def chat_assistant():
+    try:
+        data = request.json
+        messages = data.get('messages', [])
+        
+        logger.info(f"Received chat request")
+        logger.info(f"Chat history length: {len(messages)}")
+        logger.info(f"Last message: {messages[-1] if messages else 'No messages'}")
+        
+        if not messages:
+            logger.warning("No messages provided in request")
+            return jsonify({"error": "No messages provided"}), 400
+
+        # Get the latest user message
+        latest_message = messages[-1]["content"].lower() if messages else ""
+        
+        # Check if this is a design creation request (new design from scratch)
+        is_create_request = any(keyword in latest_message for keyword in [
+            "create", "design", "generate", "make", "draw", "poster", "build"
+        ]) and not any(word in latest_message for word in ["edit", "update", "modify", "change"])
+
+        # Check if this is a design modification request
+        is_modify_request = any(word in latest_message for word in ["edit", "update", "modify", "change", "adjust"]) and any(keyword in latest_message for keyword in ["design", "poster", "color", "text", "font", "size"])
+
+        # Find the most recent SVG in the conversation
+        current_svg = None
+        for msg in reversed(messages):
+            if msg.get("role") == "assistant" and "```svg" in msg.get("content", ""):
+                svg_start = msg["content"].find("```svg") + 6
+                svg_end = msg["content"].find("```", svg_start)
+                if svg_end > svg_start:
+                    current_svg = msg["content"][svg_start:svg_end].strip()
+                    break
+
+        if is_create_request:
+            logger.info("Processing new design creation request")
+            
+            try:
+                # Use the existing SVG generation pipeline
+                pre_enhanced = pre_enhance_prompt(latest_message)
+                enhanced_prompt = enhance_prompt_with_chat(pre_enhanced)
+                
+                # Generate image and SVG
+                image_base64, image_filename = generate_image_with_gpt(enhanced_prompt)
+                svg_code = generate_svg_from_image(image_base64, enhanced_prompt)
+                svg_filename = save_svg(svg_code, prefix="assistant_svg")
+                
+                # Get AI explanation of the design
+                explanation_prompt = f"I've created a design for the user. Here's the SVG code:\n\n```svg\n{svg_code}\n```\n\nPlease explain this design to the user in a friendly, conversational way. Describe the elements, colors, layout, and how it addresses their request."
+                
+                temp_messages = messages + [{"role": "user", "content": explanation_prompt}]
+                ai_explanation = chat_with_ai_about_design(temp_messages, svg_code)
+                
+                # Create comprehensive response
+                full_response = f"{ai_explanation}\n\n```svg\n{svg_code}\n```\n\nFeel free to ask me to modify any aspect of this design!"
+                
+                messages.append({"role": "assistant", "content": full_response})
+                
+                response_data = {
+                    "messages": messages,
+                    "svg_code": svg_code,
+                    "svg_url": f"/static/images/{svg_filename}"
+                }
+                logger.info("Successfully generated new design with explanation")
+                return jsonify(response_data)
+                
+            except Exception as e:
+                logger.error(f"Error in design creation: {str(e)}")
+                error_response = "I encountered an error while creating the design. Let me try a different approach or you can rephrase your request."
+                messages.append({"role": "assistant", "content": error_response})
+                return jsonify({"messages": messages})
+
+        elif is_modify_request and current_svg:
+            logger.info("Processing design modification request")
+            
+            try:
+                # Modify the existing SVG
+                modified_svg = modify_svg_with_ai(current_svg, latest_message)
+                
+                if modified_svg and modified_svg != current_svg:
+                    # Save the modified SVG
+                    svg_filename = save_svg(modified_svg, prefix="modified_svg")
+                    
+                    # Get AI explanation of the changes
+                    change_explanation_prompt = f"I've modified the design based on the user's request: '{latest_message}'. Here's the updated SVG:\n\n```svg\n{modified_svg}\n```\n\nPlease explain what changes were made and how the design now better meets their needs."
+                    
+                    temp_messages = messages + [{"role": "user", "content": change_explanation_prompt}]
+                    ai_explanation = chat_with_ai_about_design(temp_messages, modified_svg)
+                    
+                    full_response = f"{ai_explanation}\n\n```svg\n{modified_svg}\n```\n\nIs there anything else you'd like me to adjust?"
+                    
+                    messages.append({"role": "assistant", "content": full_response})
+                    
+                    response_data = {
+                        "messages": messages,
+                        "svg_code": modified_svg,
+                        "svg_url": f"/static/images/{svg_filename}"
+                    }
+                    logger.info("Successfully modified design with explanation")
+                    return jsonify(response_data)
+                else:
+                    # Fallback to conversational response
+                    ai_response = chat_with_ai_about_design(messages, current_svg)
+                    messages.append({"role": "assistant", "content": ai_response})
+                    return jsonify({"messages": messages})
+                    
+            except Exception as e:
+                logger.error(f"Error in design modification: {str(e)}")
+                ai_response = "I had trouble modifying the design. Could you be more specific about what changes you'd like me to make?"
+                messages.append({"role": "assistant", "content": ai_response})
+                return jsonify({"messages": messages})
+
+        else:
+            # Handle general conversation
+            logger.info("Processing general conversation")
+            ai_response = chat_with_ai_about_design(messages, current_svg)
+            messages.append({"role": "assistant", "content": ai_response})
+            
+            return jsonify({
+                "messages": messages,
+                "svg_code": current_svg,
+                "svg_url": None
+            })
+            
+    except Exception as e:
+        error_msg = f"Error in chat_assistant: {str(e)}"
+        logger.error(error_msg)
+        logger.exception("Full traceback:")
+        return jsonify({"error": error_msg}), 500
 
 if __name__ == '__main__':
-    # This block is only for development
-    is_development = os.environ.get('FLASK_ENV') == 'development'
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=is_development)
+    logger.info("Starting Flask application on port 5001")
+    app.run(debug=True, port=5001)
