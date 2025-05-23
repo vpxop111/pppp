@@ -26,7 +26,7 @@ CORS(app,
          'http://localhost:3001',
          'http://127.0.0.1:3000', 
          'http://127.0.0.1:3001',
-         'https://pppp-351z.onrender.com'
+         'https://pppp-351z.onrender.com',
          'https://infoui.vercel.app/'
      ],
      methods=['GET', 'POST', 'OPTIONS'],
