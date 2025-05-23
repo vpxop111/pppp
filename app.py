@@ -21,7 +21,14 @@ app = Flask(__name__)
 
 # Configure CORS with specific settings
 CORS(app, 
-     origins=['http://localhost:3000', 'http://127.0.0.1:3000', 'https://pppp-351z.onrender.com'],
+     origins=[
+         'http://localhost:3000', 
+         'http://localhost:3001',
+         'http://127.0.0.1:3000', 
+         'http://127.0.0.1:3001',
+         'https://pppp-351z.onrender.com'
+         'https://infoui.vercel.app/'
+     ],
      methods=['GET', 'POST', 'OPTIONS'],
      allow_headers=['Content-Type', 'Authorization'],
      supports_credentials=True)
