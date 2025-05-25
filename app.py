@@ -30,7 +30,7 @@ CORS(app,
          'http://127.0.0.1:3001',
          'https://pppp-351z.onrender.com',
          'https://infoui.vercel.app',
-          'https://infoui-f2zp4fwwo-varuns-projects-859429fc.vercel.app/',
+     'https://infoui-f2zp4fwwo-varuns-projects-859429fc.vercel.app',
          'https://infoui.vercel.app/'
           
      ],
