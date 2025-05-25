@@ -22,6 +22,7 @@ app = Flask(__name__)
 # Configure CORS with specific settings
 CORS(app, 
      origins=[
+          'https://infoui-git-copilot-fix-03135c45-0967ec-varuns-projects-859429fc.vercel.app/',
          'http://localhost:3000', 
          'http://localhost:3001',
          'http://127.0.0.1:3000', 
