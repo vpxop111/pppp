@@ -33,6 +33,7 @@ CORS(app,
          'https://infoui.vercel.app',
      'https://infoui-f2zp4fwwo-varuns-projects-859429fc.vercel.app',
           'https://infoui-6fk6va0qk-varuns-projects-859429fc.vercel.app',
+          'infoui-lt76sqq19-varuns-projects-859429fc.vercel.app',
          'https://infoui.vercel.app/'
           
      ],
