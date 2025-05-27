@@ -13,6 +13,8 @@ import openai
 import uuid
 from datetime import datetime
 from dotenv import load_dotenv
+import numpy as np
+from potrace import Bitmap, POTRACE_TURNPOLICY_MINORITY
 
 # Load environment variables
 load_dotenv()
@@ -77,134 +79,234 @@ PROMPT_ENHANCER_MODEL = "gpt-4o-mini"
 GPT_IMAGE_MODEL = "gpt-image-1"
 SVG_GENERATOR_MODEL = "gpt-4.1-mini"
 CHAT_ASSISTANT_MODEL = "gpt-4o-mini"
+PLANNING_MODEL = "gpt-4o-mini"
+DESIGN_KNOWLEDGE_MODEL = "gpt-4o-mini"
 
-def pre_enhance_prompt(user_input):
-    """Initial enhancement of user query using standard GPT-4o mini"""
-    logger.info(f"Pre-enhancing prompt: {user_input[:100]}...")
+def create_design_plan(user_input):
+    """Create a detailed plan for the design based on user input"""
+    logger.info(f"Creating design plan for input: {user_input[:100]}...")
     
     url = OPENAI_CHAT_ENDPOINT
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
+        "Authorization": f"Bearer {OPENAI_API_KEY_SVG}"
     }
+
+    system_prompt = """You are a modern design planning expert. Create a minimalist, professional design plan focusing on:
+
+1. Modern Design Approach
+   - Clean, professional aesthetics
+   - Minimalist composition
+   - Contemporary design trends
+   - Brand-focused elements only
+
+2. Essential Components
+   - Primary message/headline
+   - Brand elements
+   - Critical information only
+   - Whitespace utilization
+
+3. Professional Style
+   - Modern typography (max 2 fonts)
+   - Limited, professional color palette
+   - Balanced composition
+   - Clear visual hierarchy
+
+4. Technical Considerations
+   - High-quality SVG output
+   - Responsive design principles
+   - Professional animations (if needed)
+   - Performance optimization
+
+Keep the response in natural language, focusing on professional and modern design principles."""
+
+    payload = {
+        "model": PLANNING_MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": system_prompt
+            },
+            {
+                "role": "user",
+                "content": user_input
+            }
+        ],
+        "temperature": 0.7,
+        "max_tokens": 2000
+    }
+
+    logger.info("Calling OpenAI API for design planning")
+    response = requests.post(url, headers=headers, json=payload)
+    response_data = response.json()
+
+    if response.status_code != 200:
+        logger.error(f"OpenAI API error in planning: {response_data}")
+        raise Exception(f"OpenAI API error: {response_data.get('error', {}).get('message', 'Unknown error')}")
+
+    plan = response_data["choices"][0]["message"]["content"]
+    logger.info(f"Successfully created design plan: {plan[:200]}...")
+    return plan
+
+def generate_design_knowledge(design_plan):
+    """Generate specific design knowledge based on the plan"""
+    logger.info("Generating design knowledge based on plan")
+    
+    url = OPENAI_CHAT_ENDPOINT
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {OPENAI_API_KEY_SVG}"
+    }
+
+    system_prompt = """You are a design knowledge expert. Based on the provided design plan, generate specific design knowledge in plain text format. Include:
+
+1. Design principles and guidelines
+2. Color theory recommendations
+3. Typography suggestions
+4. Layout best practices
+5. Visual hierarchy tips
+6. Technical requirements
+7. Industry standards and trends
+
+Keep the response in natural language, avoiding technical formats."""
+
+    payload = {
+        "model": DESIGN_KNOWLEDGE_MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": system_prompt
+            },
+            {
+                "role": "user",
+                "content": design_plan
+            }
+        ],
+        "temperature": 0.7,
+        "max_tokens": 2000
+    }
+
+    logger.info("Calling OpenAI API for design knowledge generation")
+    response = requests.post(url, headers=headers, json=payload)
+    response_data = response.json()
+
+    if response.status_code != 200:
+        logger.error(f"OpenAI API error in knowledge generation: {response_data}")
+        raise Exception(f"OpenAI API error: {response_data.get('error', {}).get('message', 'Unknown error')}")
+
+    knowledge = response_data["choices"][0]["message"]["content"]
+    logger.info(f"Successfully generated design knowledge: {knowledge[:200]}...")
+    return knowledge
+
+def pre_enhance_prompt(user_input, design_plan, design_knowledge):
+    """Initial enhancement of user query using design plan and knowledge"""
+    logger.info(f"Pre-enhancing prompt with design context")
+    
+    url = OPENAI_CHAT_ENDPOINT
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {OPENAI_API_KEY_SVG}"
+    }
+
+    system_prompt = """You are a prompt pre-enhancement expert. Using the provided design plan and knowledge:
+
+1. Analyze the user's request in context of the design plan
+2. Incorporate relevant design knowledge
+3. Structure the prompt to include:
+   - Design type and purpose
+   - Key visual elements
+   - Style and mood
+   - Technical requirements
+   - Specific design elements
+
+Focus on creating a clear, detailed foundation for further enhancement."""
 
     payload = {
         "model": PRE_ENHANCER_MODEL,
         "messages": [
             {
                 "role": "system",
-                "content": """You are a assistant you are a prompt enhancer your task is to take input from user like "create coming soon poster for clothing company" or "create testimonial for a restaurant" you need to convert this prompt into detailed examples given below. You must modify prompt according to prompt given by user. you must make sure color and font should same as given by user if not given kindly use it on your own while keeping design principles and fundamentals in your mind.
-
-Don't add custom elements, shapes, and random figures in prompts.
-You must generate a prompt same as given below examples
-
-
-Examples for Coming Soon Pages: -
-
-- Design a clean and elegant coming soon page with a black rectangular border, centered "Coming Soon" text in a cursive font, and a white background using Water Brush font at 60px size.
-- Design a modern coming soon page with a sleek black background, a prominent complex SVG graphic, centered layout, minimalist text, and seamless integration of decorative SVG elements.
-- Design a stylish coming soon page with a soft pink background, golden brown border, cursive "something" in Allura font, and main text in Times New Roman font with heart symbols and website link.
-- Create a coming soon page with a light beige background, dark gray content area featuring large white text for "COMING SOON," a website URL, and a - "GRAND OPENING" button styled in green with custom fonts.
-- Design a natural-themed coming soon page with a dark green background, featuring Bebas Neue font in large size for "Coming" and "soon," a countdown section, and an angled exclamation mark graphic in the bottom right corner.
-- Design a coming soon page with a deep blue background, featuring centrally positioned text in Tektur font (white for 'COMING' with shadow, orange for 'SOON' with shadow), and white lines for definition, all slightly rotated.
-- Design a warm and welcoming coming soon page with a beige background, centered layout, modern font for the title, cursive and bold fonts for 'Coming Soon,' and simple font for a website link, including decorative SVG elements.
-- Design a warm and inviting coming soon page with a light beige background, bold 'COMING SOON' text in a darker brown color, and a date below in 'Open Sans' font.
-- Design a playful coming soon page with a cream background, grid pattern, bold text in warm taupe, cursive text in dark green, and sans-serif font for additional information, ensuring a centered layout for clarity and appeal.
-- Design an elegant coming soon page with beige background, featuring 'LARANA STORE' in bold serif font, 'BEAUTY PRODUCT' in a decorative rectangle, and 'COMING SOON' in red and cursive font, with 'STAY TUNED' and '@REALLYGREATSITE' included, along with whimsical star shapes for a playful touch.
-- Design a bold and modern coming soon page with black background, gray border, large Bebas Neue text for "COMING" and "SOON," decorative Allura font for "-Best Store-" and "Stay Tuned," and a date of 12.12.2025, with clear website link at the bottom.
-- Design a clean coming soon page with a white background, a beige box with a grey border, 'LICERIA & CO.' at the top in large dark blue-grey text, 'WE ARE' below in smaller text, 'OPEN' centered, and 'OPENING HOURS' with hours displayed below.
-- Design a modern and minimalistic coming soon page with a clean white background, featuring centered text in Open Sans font and time indicators styled in dark gray.
-- Design a coming soon page with centered text elements in black color on a soft pink background, featuring the phrases 'NOW WE ARE', 'OPEN', and 'VISIT OUR SITE' with specific font styles and sizes. Include a website link at the bottom in a regular font.
-
-Examples for Testimonial Designs: -
-
-
-- Design a testimonial graphic with a teal background, featuring a beige square container with "TESTIMONIAL" in bold Alfarn font, three orange circles below, PT Serif font for customer experience lines, and square quotation marks for visual appeal.,
-- Design a testimonial with a white background, a large pink circle in the center, testimonial text in Raleway font, customer's name at the bottom, and decorative elements like 4-spoke stars and a dotted circle.,
-- Create a testimonial with a cream background, black quotation marks, centered title "Testimonial," testimonial text "We couldn't be happier with the outstanding service provided by Weblake Company...," author name "- Linda Brown -" centered below, and website URL "a.barnescopy.site.com" at the bottom in Instrument Serif font.,
-- Design a testimonial with a neon green header, black background, and round corner speech box, featuring the title "CLIENT TESTIMONIAL" in Bebas Neue font at 80px, testimonial text in Neue font at 42px, and name "MIHIR GEHLOT" in Raleway font at 36px, all centered and styled accordingly.,
-- Design a testimonial with a blue background and a light blue header, featuring a bold "Testimonial" title in orange Abril Fatface font, followed by a warm message in Raleway font within a white speech box with rounded corners. Include the website URL in PT Serif font at the bottom.,
-- Design a testimonial with yellow background, a central white text box with dotted border, Lato font for main message, Montserrat font for name "Olivia Wilson," and a blue underline, without an image.,
-- Create a testimonial with a mint green background, featuring a bold red "CLIENT FEEDBACK" title at the top, a white rounded rectangle for the testimonial text, and include the customer name "OLIVIA WILSON" with five blue stars for a 5-star rating.,
-- Design a testimonial with a centered title "CLIENT REVIEWS" in bold Courier Std font, italic Coromont Garamond text in a dark gray container, and five gold stars for rating, all on a clean white background.,
-- Design a testimonial with Viaboda Libre title and Playfair Display font for positive feedback by "Rakhi Sawant," with left and right quote SVGs on a pale yellow background.,
-- Design a testimonial with a blue background and a light blue header, featuring a bold "Testimonial" title in orange Abril Fatface font, followed by a warm message in Raleway font within a white speech box with rounded corners. Include the website URL in PT Serif font at the bottom.,
-"""
+                "content": system_prompt
             },
             {
                 "role": "user",
-                "content": user_input
+                "content": json.dumps({
+                    "user_input": user_input,
+                    "design_plan": design_plan,
+                    "design_knowledge": design_knowledge
+                })
             }
         ],
-        "temperature": 1,
-        "max_tokens": 4000
+        "temperature": 0.7,
+        "max_tokens": 2000
     }
 
-    logger.info(f"Calling OpenAI Chat API for initial prompt enhancement with model: {PRE_ENHANCER_MODEL}")
+    logger.info("Calling OpenAI API for prompt pre-enhancement")
     response = requests.post(url, headers=headers, json=payload)
     response_data = response.json()
 
     if response.status_code != 200:
-        logger.error(f"OpenAI API error: {response_data}")
-        logger.error(f"Response status code: {response.status_code}")
-        logger.error(f"Response headers: {response.headers}")
+        logger.error(f"OpenAI API error in pre-enhancement: {response_data}")
         raise Exception(f"OpenAI API error: {response_data.get('error', {}).get('message', 'Unknown error')}")
 
-    enhanced_prompt = response_data["choices"][0]["message"]["content"]
-    logger.info(f"Successfully enhanced prompt. Result: {enhanced_prompt[:100]}...")
-    return enhanced_prompt
+    pre_enhanced = response_data["choices"][0]["message"]["content"]
+    logger.info(f"Successfully pre-enhanced prompt: {pre_enhanced[:200]}...")
+    return pre_enhanced
 
-def enhance_prompt_with_chat(user_input):
-    """Enhance user prompt using Chat Completions API"""
+def enhance_prompt_with_chat(pre_enhanced_prompt, design_plan, design_knowledge):
+    """Final prompt enhancement incorporating all previous stages"""
+    logger.info("Performing final prompt enhancement")
+    
     url = OPENAI_CHAT_ENDPOINT
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
+        "Authorization": f"Bearer {OPENAI_API_KEY_SVG}"
     }
+
+    system_prompt = """You are a final prompt enhancement expert. Your task is to:
+
+1. Refine and optimize the pre-enhanced prompt
+2. Ensure all design requirements are clearly specified
+3. Add specific details for:
+   - Layout and composition
+   - Color schemes and relationships
+   - Typography and text treatment
+   - Visual elements and their placement
+   - SVG-specific requirements
+
+Create a comprehensive prompt that will guide the image and SVG generation."""
 
     payload = {
         "model": PROMPT_ENHANCER_MODEL,
         "messages": [
             {
                 "role": "system",
-                "content": """You are a prompt enhancer assistant. You transform simple, brief prompts into detailed,
-                comprehensive prompts that provide specific details, requirements, and context to help generate better results.
-                
-                For both coming soon pages and testimonial designs, ensure you include specific details about:
-                - Layout and positioning
-                - Font choices, sizes, and styles
-                - Color schemes and background designs
-                - Decorative elements and their placement
-                - Text content and hierarchy
-                - Spacing and alignment
-
-                
-                Add these requirements at the end of each prompt:
-                'Compulsory in you use create good svg code must meaningfull and good and also usable for user ok msut look good'
-                'Compulsory in you use any color must make sense and text color and and all continer bg color must visible togther'
-                'Compulsory in This must you make all svg code must be center align in good aligmnet'
-                'Compulsory IN THIS FETCH FONT USING LINK AND FONT FACE BOTH
-                'Compulsory IN THIS ALIGMENT MUST BE GOOD AND GOOD LOOKING"
-                '"""
+                "content": system_prompt
             },
             {
                 "role": "user",
-                "content": user_input
+                "content": json.dumps({
+                    "pre_enhanced_prompt": pre_enhanced_prompt,
+                    "design_plan": design_plan,
+                    "design_knowledge": design_knowledge
+                })
             }
         ],
-        "temperature": 1,
-        "max_tokens": 4000
+        "temperature": 0.7,
+        "max_tokens": 2000
     }
 
-    logger.info(f"Calling OpenAI Chat API for prompt enhancement with model: {PROMPT_ENHANCER_MODEL}")
+    logger.info("Calling OpenAI API for final prompt enhancement")
     response = requests.post(url, headers=headers, json=payload)
     response_data = response.json()
 
     if response.status_code != 200:
-        logger.error(f"OpenAI API error: {response_data}")
+        logger.error(f"OpenAI API error in final enhancement: {response_data}")
         raise Exception(f"OpenAI API error: {response_data.get('error', {}).get('message', 'Unknown error')}")
 
-    return response_data["choices"][0]["message"]["content"]
+    enhanced = response_data["choices"][0]["message"]["content"]
+    logger.info(f"Successfully enhanced prompt: {enhanced[:200]}...")
+    return enhanced
 
 def generate_image_with_gpt(enhanced_prompt):
     """Generate image using GPT Image-1 model"""
@@ -225,97 +327,66 @@ def generate_image_with_gpt(enhanced_prompt):
         filename = save_image(image_base64, prefix="gpt_image")
         
         logger.info("Image generated and saved successfully with GPT Image-1")
-        return image_base64, filename
+        return filename
     except Exception as e:
         logger.error(f"Error generating image with GPT Image-1: {str(e)}")
         raise
 
-def generate_svg_from_image(image_base64, enhanced_prompt):
-    """Generate SVG code using GPT-4.1 based on image and prompt"""
-    logger.info("Starting SVG generation from image")
-    logger.info(f"Enhanced prompt length: {len(enhanced_prompt)}")
+def generate_svg_from_image(image_path, enhanced_prompt):
+    """Generate SVG using Potrace based on image"""
+    logger.info("Starting SVG generation from image using Potrace")
     
-    url = "https://api.openai.com/v1/chat/completions"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {OPENAI_API_KEY_SVG}"
-    }
-
-    # Restored original system prompt
-    system_prompt = """You are an expert SVG code generator. Your task is to create precise, clean, and optimized SVG code that exactly matches the provided image. Follow these guidelines:
-
-1. Create SVG with dimensions 1080x1080 pixels
-2. Ensure perfect positioning and alignment of all elements
-3. Use appropriate viewBox and preserveAspectRatio attributes
-4. Implement proper layering of elements
-5. Optimize paths and shapes for better performance
-6. Use semantic grouping (<g>) for related elements
-7. Include necessary font definitions and styles
-8. Ensure text elements are properly positioned and styled
-9. Implement gradients, patterns, or filters if present in the image
-10. Use precise color values matching the image exactly
-
-Focus on producing production-ready, clean SVG code that renders identically to the input image.
-Return ONLY the SVG code without any explanations or comments."""
-
-    # Create the image content
-    image_content = {
-        "type": "image_url",
-        "image_url": {
-            "url": f"data:image/png;base64,{image_base64}"
-        }
-    }
-
-    message_content = [
-        {
-            "type": "text",
-            "text": "Generate SVG code (1080x1080) that matches this image exactly."
-        },
-        image_content
-    ]
-
-    payload = {
-        "model": SVG_GENERATOR_MODEL,
-        "messages": [
-            {
-                "role": "system",
-                "content": system_prompt
-            },
-            {
-                "role": "user",
-                "content": message_content
-            }
-        ],
-        "temperature": 1,  # Restored original temperature
-        "max_tokens": 4000
-    }
-
-    logger.info("Generating SVG code with GPT-4.1")
-    response = requests.post(url, headers=headers, json=payload)
-    response_data = response.json()
-
-    if response.status_code != 200:
-        logger.error(f"OpenAI API error in SVG generation: {response_data}")
-        logger.error(f"Response status code: {response.status_code}")
-        raise Exception(f"OpenAI API error: {response_data.get('error', {}).get('message', 'Unknown error')}")
-
-    svg_content = response_data["choices"][0]["message"]["content"]
-    logger.info(f"Successfully generated SVG code. Length: {len(svg_content)}")
-    
-    # Extract SVG code
-    svg_pattern = r'<svg.*?<\/svg>'
-    svg_matches = re.search(svg_pattern, svg_content, re.DOTALL)
-    
-    if svg_matches:
-        logger.info("Successfully extracted SVG code from response")
-        raw_svg = svg_matches.group(0)
-        # Use original clean function with minimal changes
-        formatted_svg = clean_svg_code_original(raw_svg)
-        return formatted_svg
-    
-    logger.warning("Could not extract SVG pattern, attempting to clean raw content")
-    formatted_svg = clean_svg_code_original(svg_content)
-    return formatted_svg
+    try:
+        # Get full path to the image
+        input_image_path = os.path.join(IMAGES_DIR, image_path)
+        
+        # Load and preprocess the image
+        image = Image.open(input_image_path)
+        
+        # Convert to bitmap for potrace
+        bm = Bitmap(image, blacklevel=0.5)
+        
+        # Trace the bitmap to get curves
+        plist = bm.trace(
+            turdsize=2,
+            turnpolicy=POTRACE_TURNPOLICY_MINORITY,
+            alphamax=1,
+            opticurve=True,
+            opttolerance=0.2,
+        )
+        
+        # Generate SVG content
+        width, height = image.size
+        svg_content = f'''<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="{width}" height="{height}" viewBox="0 0 {width} {height}">'''
+        
+        parts = []
+        for curve in plist:
+            fs = curve.start_point
+            parts.append(f"M{fs.x},{fs.y}")
+            for segment in curve.segments:
+                if segment.is_corner:
+                    a = segment.c
+                    b = segment.end_point
+                    parts.append(f"L{a.x},{a.y}L{b.x},{b.y}")
+                else:
+                    a = segment.c1
+                    b = segment.c2
+                    c = segment.end_point
+                    parts.append(f"C{a.x},{a.y} {b.x},{b.y} {c.x},{c.y}")
+            parts.append("z")
+        
+        svg_content += f'<path stroke="none" fill="black" fill-rule="evenodd" d="{"".join(parts)}"/>'
+        svg_content += "</svg>"
+        
+        # Save SVG content to a temporary file
+        svg_filename = save_svg(svg_content)
+        
+        logger.info(f"SVG generated successfully: {svg_filename}")
+        return svg_filename
+        
+    except Exception as e:
+        logger.error(f"Error in SVG generation with Potrace: {str(e)}")
+        raise
 
 def clean_svg_code_original(svg_code):
     """Original clean and validate SVG code function"""
@@ -414,58 +485,73 @@ def serve_image(filename):
 
 @app.route('/api/generate-svg', methods=['POST'])
 def generate_svg():
-    """Original SVG generator endpoint with high quality"""
+    """Enhanced SVG generator endpoint with detailed workflow stages"""
     try:
         data = request.json
         user_input = data.get('prompt', '')
-        skip_enhancement = data.get('skip_enhancement', False)
 
         if not user_input:
             return jsonify({"error": "No prompt provided"}), 400
 
-        logger.info(f"Processing prompt: {user_input[:50]}... Skip enhancement: {skip_enhancement}")
-
-        if skip_enhancement:
-            # Skip enhancement and use the original prompt directly
-            prompt_to_use = user_input
-            pre_enhanced_prompt = user_input
-            enhanced_prompt = user_input
-            logger.info(f"Using original prompt without enhancement: {prompt_to_use[:50]}...")
-        else:
-            # Step 1: Pre-enhance the prompt
-            pre_enhanced_prompt = pre_enhance_prompt(user_input)
-            logger.info(f"Pre-enhanced prompt: {pre_enhanced_prompt[:50]}...")
-
-            # Step 2: Further enhance the prompt
-            enhanced_prompt = enhance_prompt_with_chat(pre_enhanced_prompt)
-            logger.info(f"Enhanced prompt: {enhanced_prompt[:50]}...")
-            
-            prompt_to_use = enhanced_prompt
-
-        # Step 3: Generate image using GPT Image-1
-        gpt_image_base64, gpt_image_filename = generate_image_with_gpt(prompt_to_use)
-        logger.info("Image generated with GPT Image-1")
-
-        # Step 4: Generate SVG using GPT-4.1
-        svg_code = generate_svg_from_image(gpt_image_base64, prompt_to_use)
-        logger.info("SVG code generated from image")
+        logger.info(f"Starting design generation process for: {user_input[:50]}...")
         
+        # Track progress for UI feedback
+        progress = {
+            "stage": "planning",
+            "progress": 0,
+            "message": "Creating design plan..."
+        }
+
+        # Step 1: Create Design Plan
+        design_plan = create_design_plan(user_input)
+        progress.update({"stage": "knowledge", "progress": 20, "message": "Generating design knowledge..."})
+
+        # Step 2: Generate Design Knowledge
+        design_knowledge = generate_design_knowledge(design_plan)
+        progress.update({"stage": "pre_enhancement", "progress": 40, "message": "Pre-enhancing prompt..."})
+
+        # Step 3: Pre-enhance Prompt
+        pre_enhanced_prompt = pre_enhance_prompt(user_input, design_plan, design_knowledge)
+        progress.update({"stage": "enhancement", "progress": 60, "message": "Enhancing prompt..."})
+
+        # Step 4: Final Prompt Enhancement
+        enhanced_prompt = enhance_prompt_with_chat(pre_enhanced_prompt, design_plan, design_knowledge)
+        progress.update({"stage": "image_generation", "progress": 80, "message": "Generating image..."})
+
+        # Step 5: Generate Image
+        image_path = generate_image_with_gpt(enhanced_prompt)
+        progress.update({"stage": "svg_generation", "progress": 90, "message": "Generating SVG..."})
+
+        # Step 6: Generate SVG
+        svg_path = generate_svg_from_image(image_path, enhanced_prompt)
+        progress.update({"stage": "complete", "progress": 100, "message": "Design complete!"})
+
         # Save the SVG
-        svg_filename = save_svg(svg_code, prefix="svg")
+        svg_filename = save_svg(svg_path)
 
         return jsonify({
+            "design_plan": design_plan,
+            "design_knowledge": design_knowledge,
             "original_prompt": user_input,
             "pre_enhanced_prompt": pre_enhanced_prompt,
             "enhanced_prompt": enhanced_prompt,
-            "gpt_image_base64": gpt_image_base64,
-            "gpt_image_url": f"/static/images/{gpt_image_filename}",
-            "svg_code": svg_code,
-            "svg_url": f"/static/images/{svg_filename}"
+            "image_path": image_path,
+            "svg_path": svg_path,
+            "svg_url": f"/static/images/{svg_filename}",
+            "progress": progress
         })
 
     except Exception as e:
         logger.error(f"Error in generate_svg: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        logger.exception("Full traceback:")
+        return jsonify({
+            "error": str(e),
+            "progress": {
+                "stage": "error",
+                "progress": 0,
+                "message": f"Error: {str(e)}"
+            }
+        }), 500
 
 def chat_with_ai_about_design(messages, current_svg=None):
     """Enhanced conversational AI that can discuss and modify designs"""
@@ -474,7 +560,7 @@ def chat_with_ai_about_design(messages, current_svg=None):
     url = OPENAI_CHAT_ENDPOINT
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
+        "Authorization": f"Bearer {OPENAI_API_KEY_SVG}"
     }
 
     # Create system prompt that includes SVG knowledge
@@ -613,7 +699,7 @@ def chat_assistant():
         data = request.json
         messages = data.get('messages', [])
         
-        logger.info(f"Received chat request")
+        logger.info("Received chat request")
         logger.info(f"Chat history length: {len(messages)}")
         logger.info(f"Last message: {messages[-1] if messages else 'No messages'}")
         
@@ -624,119 +710,58 @@ def chat_assistant():
         # Get the latest user message
         latest_message = messages[-1]["content"].lower() if messages else ""
         
-        # Check if this is a design creation request (new design from scratch)
-        is_create_request = any(keyword in latest_message for keyword in [
-            "create", "design", "generate", "make", "draw", "poster", "build"
-        ]) and not any(word in latest_message for word in ["edit", "update", "modify", "change"])
-
-        # Check if this is a design modification request
-        is_modify_request = any(word in latest_message for word in ["edit", "update", "modify", "change", "adjust"]) and any(keyword in latest_message for keyword in ["design", "poster", "color", "text", "font", "size"])
-
-        # Find the most recent SVG in the conversation
-        current_svg = None
-        for msg in reversed(messages):
-            if msg.get("role") == "assistant" and "```svg" in msg.get("content", ""):
-                svg_start = msg["content"].find("```svg") + 6
-                svg_end = msg["content"].find("```", svg_start)
-                if svg_end > svg_start:
-                    current_svg = msg["content"][svg_start:svg_end].strip()
-                    break
-
-        if is_create_request:
-            logger.info("Processing new design creation request")
+        logger.info("Processing new design creation request")
             
-            try:
-                # Use the existing SVG generation pipeline
-                pre_enhanced = pre_enhance_prompt(latest_message)
-                enhanced_prompt = enhance_prompt_with_chat(pre_enhanced)
-                
-                # Generate image and SVG
-                image_base64, image_filename = generate_image_with_gpt(enhanced_prompt)
-                svg_code = generate_svg_from_image(image_base64, enhanced_prompt)
-                svg_filename = save_svg(svg_code, prefix="assistant_svg")
-                
-                # Get AI explanation of the design
-                explanation_prompt = f"I've created a design for the user. Here's the SVG code:\n\n```svg\n{svg_code}\n```\n\nPlease explain this design to the user in a friendly, conversational way. Describe the elements, colors, layout, and how it addresses their request."
-                
-                temp_messages = messages + [{"role": "user", "content": explanation_prompt}]
-                ai_explanation = chat_with_ai_about_design(temp_messages, svg_code)
-                
-                # Create comprehensive response
-                full_response = f"{ai_explanation}\n\n```svg\n{svg_code}\n```\n\nFeel free to ask me to modify any aspect of this design!"
-                
-                messages.append({"role": "assistant", "content": full_response})
-                
-                response_data = {
-                    "messages": messages,
-                    "svg_code": svg_code,
-                    "svg_url": f"/static/images/{svg_filename}"
-                }
-                logger.info("Successfully generated new design with explanation")
-                return jsonify(response_data)
-                
-            except Exception as e:
-                logger.error(f"Error in design creation: {str(e)}")
-                error_response = "I encountered an error while creating the design. Let me try a different approach or you can rephrase your request."
-                messages.append({"role": "assistant", "content": error_response})
-                return jsonify({"messages": messages})
+        # Step 1: Create design plan
+        design_plan = create_design_plan(latest_message)
+        logger.info("Design Plan Generated")
 
-        elif is_modify_request and current_svg:
-            logger.info("Processing design modification request")
-            
-            try:
-                # Modify the existing SVG
-                modified_svg = modify_svg_with_ai(current_svg, latest_message)
-                
-                if modified_svg and modified_svg != current_svg:
-                    # Save the modified SVG
-                    svg_filename = save_svg(modified_svg, prefix="modified_svg")
-                    
-                    # Get AI explanation of the changes
-                    change_explanation_prompt = f"I've modified the design based on the user's request: '{latest_message}'. Here's the updated SVG:\n\n```svg\n{modified_svg}\n```\n\nPlease explain what changes were made and how the design now better meets their needs."
-                    
-                    temp_messages = messages + [{"role": "user", "content": change_explanation_prompt}]
-                    ai_explanation = chat_with_ai_about_design(temp_messages, modified_svg)
-                    
-                    full_response = f"{ai_explanation}\n\n```svg\n{modified_svg}\n```\n\nIs there anything else you'd like me to adjust?"
-                    
-                    messages.append({"role": "assistant", "content": full_response})
-                    
-                    response_data = {
-                        "messages": messages,
-                        "svg_code": modified_svg,
-                        "svg_url": f"/static/images/{svg_filename}"
-                    }
-                    logger.info("Successfully modified design with explanation")
-                    return jsonify(response_data)
-                else:
-                    # Fallback to conversational response
-                    ai_response = chat_with_ai_about_design(messages, current_svg)
-                    messages.append({"role": "assistant", "content": ai_response})
-                    return jsonify({"messages": messages})
-                    
-            except Exception as e:
-                logger.error(f"Error in design modification: {str(e)}")
-                ai_response = "I had trouble modifying the design. Could you be more specific about what changes you'd like me to make?"
-                messages.append({"role": "assistant", "content": ai_response})
-                return jsonify({"messages": messages})
+        # Step 2: Generate design knowledge
+        design_knowledge = generate_design_knowledge(design_plan)
+        logger.info("Design Knowledge Generated")
 
-        else:
-            # Handle general conversation
-            logger.info("Processing general conversation")
-            ai_response = chat_with_ai_about_design(messages, current_svg)
-            messages.append({"role": "assistant", "content": ai_response})
-            
-            return jsonify({
-                "messages": messages,
-                "svg_code": current_svg,
-                "svg_url": None
-            })
+        # Step 3: Pre-enhance prompt
+        pre_enhanced_prompt = pre_enhance_prompt(latest_message, design_plan, design_knowledge)
+        logger.info("Pre-enhanced Prompt Created")
+
+        # Step 4: Final prompt enhancement
+        enhanced_prompt = enhance_prompt_with_chat(pre_enhanced_prompt, design_plan, design_knowledge)
+        logger.info("Enhanced Prompt Generated")
+
+        # Step 5: Generate initial image
+        image_filename = generate_image_with_gpt(enhanced_prompt)
+        logger.info(f"Image generated: {image_filename}")
+
+        # Step 6: Generate SVG from image
+        svg_path = generate_svg_from_image(image_filename, enhanced_prompt)
+        svg_filename = save_svg(svg_path)
+        logger.info(f"SVG generated: {svg_filename}")
+
+        # Step 7: Generate explanation
+        explanation = chat_with_ai_about_design(messages + [{"role": "assistant", "content": svg_path}])
+        logger.info("Explanation Generated")
+
+        return jsonify({
+            "response": explanation,
+            "svg_path": svg_path,
+            "image": image_filename,
+            "progress": {
+                "stage": "complete",
+                "progress": 100,
+                "message": "Design complete!"
+            }
+        })
             
     except Exception as e:
-        error_msg = f"Error in chat_assistant: {str(e)}"
-        logger.error(error_msg)
-        logger.exception("Full traceback:")
-        return jsonify({"error": error_msg}), 500
+        logger.error(f"Error in design creation: {str(e)}")
+        return jsonify({
+            "error": str(e),
+            "progress": {
+                "stage": "error",
+                "progress": 0,
+                "message": f"Error: {str(e)}"
+            }
+        }), 500
 
 if __name__ == '__main__':
     # Get port from environment variable (Render sets PORT=8000)
