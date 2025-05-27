@@ -6,3 +6,6 @@ pillow
 openai
 python-dotenv
 gunicorn
+potrace
+numpy
+pypotrace
