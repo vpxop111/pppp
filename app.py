@@ -13,8 +13,7 @@ import openai
 import uuid
 from datetime import datetime
 from dotenv import load_dotenv
-import numpy as np
-from potrace import Bitmap, POTRACE_TURNPOLICY_MINORITY
+import vtracer  # Add vtracer import
 
 # Load environment variables
 load_dotenv()
@@ -24,20 +23,13 @@ app = Flask(__name__)
 # Configure CORS with specific settings
 CORS(app, 
      origins=[
-          'https://infoui-6fk6va0qk-varuns-projects-859429fc.vercel.app',
-         'infoui-f2zp4fwwo-varuns-projects-859429fc.vercel.app',
-         'https://infoui-git-copilot-fix-03135c45-0967ec-varuns-projects-859429fc.vercel.app',
          'http://localhost:3000', 
          'http://localhost:3001',
          'http://127.0.0.1:3000', 
          'http://127.0.0.1:3001',
          'https://pppp-351z.onrender.com',
          'https://infoui.vercel.app',
-     'https://infoui-f2zp4fwwo-varuns-projects-859429fc.vercel.app',
-          'https://infoui-6fk6va0qk-varuns-projects-859429fc.vercel.app',
-          'infoui-lt76sqq19-varuns-projects-859429fc.vercel.app',
          'https://infoui.vercel.app/'
-          
      ],
      methods=['GET', 'POST', 'OPTIONS'],
      allow_headers=['Content-Type', 'Authorization'],
@@ -73,59 +65,325 @@ openai.api_key = OPENAI_API_KEY_SVG
 OPENAI_API_BASE = "https://api.openai.com/v1"
 OPENAI_CHAT_ENDPOINT = f"{OPENAI_API_BASE}/chat/completions"
 
-# Model names
-PRE_ENHANCER_MODEL = "gpt-4o-mini"
-PROMPT_ENHANCER_MODEL = "gpt-4o-mini"
+# Model names - updated to use GPT-4.1 mini for logic/text and gpt-image for images
+PLANNER_MODEL = "gpt-4.1-mini"
+DESIGN_KNOWLEDGE_MODEL = "gpt-4.1-mini"
+PRE_ENHANCER_MODEL = "gpt-4.1-mini"
+PROMPT_ENHANCER_MODEL = "gpt-4.1-mini"
 GPT_IMAGE_MODEL = "gpt-image-1"
 SVG_GENERATOR_MODEL = "gpt-4.1-mini"
-CHAT_ASSISTANT_MODEL = "gpt-4o-mini"
-PLANNING_MODEL = "gpt-4o-mini"
-DESIGN_KNOWLEDGE_MODEL = "gpt-4o-mini"
+CHAT_ASSISTANT_MODEL = "gpt-4.1-mini"
 
-def create_design_plan(user_input):
-    """Create a detailed plan for the design based on user input"""
-    logger.info(f"Creating design plan for input: {user_input[:100]}...")
+def check_vector_suitability(user_input):
+    """Check if the prompt is suitable for SVG vector graphics"""
+    logger.info(f"Checking vector suitability for: {user_input[:100]}...")
     
     url = OPENAI_CHAT_ENDPOINT
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {OPENAI_API_KEY_SVG}"
+        "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
     }
 
-    system_prompt = """You are a modern design planning expert. Create a minimalist, professional design plan focusing on:
-
-1. Modern Design Approach
-   - Clean, professional aesthetics
-   - Minimalist composition
-   - Contemporary design trends
-   - Brand-focused elements only
-
-2. Essential Components
-   - Primary message/headline
-   - Brand elements
-   - Critical information only
-   - Whitespace utilization
-
-3. Professional Style
-   - Modern typography (max 2 fonts)
-   - Limited, professional color palette
-   - Balanced composition
-   - Clear visual hierarchy
-
-4. Technical Considerations
-   - High-quality SVG output
-   - Responsive design principles
-   - Professional animations (if needed)
-   - Performance optimization
-
-Keep the response in natural language, focusing on professional and modern design principles."""
-
     payload = {
-        "model": PLANNING_MODEL,
+        "model": PLANNER_MODEL,
         "messages": [
             {
                 "role": "system",
-                "content": system_prompt
+                "content": """You are a vector graphics expert. Your task is to determine if a design request is suitable for SVG vector graphics.
+
+Guidelines for SVG suitability:
+1. Ideal for logos, icons, illustrations, typography, and geometric designs
+2. Good for flat or minimalist designs
+3. Suitable for designs with clear shapes and paths
+4. Works well with text and typography
+5. Perfect for scalable graphics without loss of quality
+
+Not suitable for:
+1. Photorealistic images
+2. Complex textures and gradients
+3. Designs requiring many minute details
+4. Photographs or photo manipulations
+5. Complex 3D renderings
+
+Provide guidance if the request isn't suitable."""
+            },
+            {
+                "role": "user",
+                "content": user_input
+            }
+        ],
+        "temperature": 0.7,
+        "max_tokens": 500
+    }
+
+    response = requests.post(url, headers=headers, json=payload)
+    response_data = response.json()
+
+    if response.status_code != 200:
+        logger.error(f"Vector suitability check error: {response_data}")
+        return {"not_suitable": False}  # Default to allowing if check fails
+
+    analysis = response_data["choices"][0]["message"]["content"].lower()
+    not_suitable = "not suitable" in analysis or "unsuitable" in analysis
+    
+    return {
+        "not_suitable": not_suitable,
+        "guidance": response_data["choices"][0]["message"]["content"] if not_suitable else None
+    }
+
+def plan_design(user_input):
+    """Plan the design approach based on user input"""
+    logger.info(f"Planning design for: {user_input[:100]}...")
+    
+    url = OPENAI_CHAT_ENDPOINT
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
+    }
+
+    payload = {
+        "model": PLANNER_MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": """You are a design planner. Create a structured plan for the design request.
+
+Your plan should include:
+1. Design Goals
+   - Main purpose
+   - Target audience
+   - Key message/emotion
+
+2. Design Elements
+   - Layout structure
+   - Key components
+   - Typography needs
+   - Color scheme approach
+   - Visual hierarchy
+
+3. Technical Considerations
+   - SVG optimization requirements
+   - Responsive design needs
+   - Browser compatibility
+   - Performance considerations
+
+4. Implementation Strategy
+   - Component breakdown
+   - Order of creation
+   - Special effects/animations
+   - Testing requirements
+
+Be specific and practical. Focus on actionable details."""
+            },
+            {
+                "role": "user",
+                "content": user_input
+            }
+        ],
+        "temperature": 0.7,
+        "max_tokens": 1000
+    }
+
+    response = requests.post(url, headers=headers, json=payload)
+    response_data = response.json()
+
+    if response.status_code != 200:
+        logger.error(f"Design planning error: {response_data}")
+        return "Error in design planning"
+
+    return response_data["choices"][0]["message"]["content"]
+
+def generate_design_knowledge(design_plan, user_input):
+    """Generate specific design knowledge based on the plan and user input"""
+    logger.info("Generating design knowledge...")
+    
+    url = OPENAI_CHAT_ENDPOINT
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
+    }
+
+    payload = {
+        "model": DESIGN_KNOWLEDGE_MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": """You are a design knowledge expert. Based on the design plan and user request, provide specific design knowledge and best practices.
+
+Include:
+1. Typography
+   - Font recommendations
+   - Size hierarchies
+   - Spacing guidelines
+
+2. Color Theory
+   - Color palette suggestions
+   - Contrast requirements
+   - Accessibility considerations
+
+3. Layout Principles
+   - Grid systems
+   - Alignment rules
+   - White space usage
+
+4. SVG Best Practices
+   - Element organization
+   - Optimization techniques
+   - Animation possibilities
+
+5. Technical Guidelines
+   - Viewport settings
+   - Responsive design approaches
+   - Browser compatibility considerations
+
+Be specific and provide actionable insights."""
+            },
+            {
+                "role": "user",
+                "content": f"Design Plan:\n{design_plan}\n\nUser Request:\n{user_input}"
+            }
+        ],
+        "temperature": 0.7,
+        "max_tokens": 1500
+    }
+
+    response = requests.post(url, headers=headers, json=payload)
+    response_data = response.json()
+
+    if response.status_code != 200:
+        logger.error(f"Design knowledge generation error: {response_data}")
+        return "Error in generating design knowledge"
+
+    return response_data["choices"][0]["message"]["content"]
+
+def pre_enhance_prompt(user_input):
+    """Initial enhancement of user query using standard GPT-4o mini"""
+    logger.info(f"Pre-enhancing prompt: {user_input[:100]}...")
+    
+    url = OPENAI_CHAT_ENDPOINT
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
+    }
+
+    payload = {
+        "model": PRE_ENHANCER_MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": """You are an expert design prompt enhancer. Your task is to take a user's design request and enhance it with specific details about:
+
+1. Layout and Composition
+   - Overall structure
+   - Element positioning
+   - Balance and hierarchy
+   - Whitespace usage
+
+2. Typography
+   - Font styles and families
+   - Text sizes and weights
+   - Text alignment and spacing
+   - Font combinations
+
+3. Colors
+   - Color scheme
+   - Background colors
+   - Text colors
+   - Element colors
+   - Color relationships
+
+4. Visual Elements
+   - Shapes and forms
+   - Lines and borders
+   - Icons and symbols
+   - Decorative elements
+
+5. Technical Requirements
+   - SVG-specific considerations
+   - Responsive design needs
+   - Browser compatibility
+   - Accessibility requirements
+
+Convert the user's request into a detailed, technical design specification that maintains their original intent while adding necessary details for SVG creation.
+
+Focus on vector-friendly design elements and avoid non-SVG compatible features."""
+            },
+            {
+                "role": "user",
+                "content": user_input
+            }
+        ],
+        "temperature": 0.7,
+        "max_tokens": 1500
+    }
+
+    logger.info(f"Calling OpenAI Chat API for initial prompt enhancement with model: {PRE_ENHANCER_MODEL}")
+    response = requests.post(url, headers=headers, json=payload)
+    response_data = response.json()
+
+    if response.status_code != 200:
+        logger.error(f"OpenAI API error: {response_data}")
+        logger.error(f"Response status code: {response.status_code}")
+        logger.error(f"Response headers: {response.headers}")
+        raise Exception(f"OpenAI API error: {response_data.get('error', {}).get('message', 'Unknown error')}")
+
+    enhanced_prompt = response_data["choices"][0]["message"]["content"]
+    logger.info(f"Successfully enhanced prompt. Result: {enhanced_prompt[:100]}...")
+    return enhanced_prompt
+
+def enhance_prompt_with_chat(user_input):
+    """Enhance user prompt using Chat Completions API"""
+    url = OPENAI_CHAT_ENDPOINT
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
+    }
+
+    payload = {
+        "model": PROMPT_ENHANCER_MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": """You are an advanced SVG design prompt optimizer. Your role is to take a pre-enhanced design prompt and optimize it for SVG generation by ensuring:
+
+1. Vector Optimization
+   - Emphasize vector-friendly elements
+   - Specify paths and shapes clearly
+   - Define gradients and patterns appropriately
+   - Optimize for SVG capabilities
+
+2. Technical Precision
+   - Exact dimensions and positions
+   - Precise color values (HEX/RGB)
+   - Font specifications with fallbacks
+   - SVG viewport settings
+
+3. Component Organization
+   - Layering structure
+   - Group definitions
+   - Element IDs and classes
+   - Reusable components
+
+4. Performance Considerations
+   - Optimize paths
+   - Minimize complexity
+   - Efficient use of groups
+   - Browser compatibility
+
+5. Accessibility and Responsiveness
+   - ARIA labels
+   - Semantic structure
+   - Responsive scaling
+   - Cross-browser support
+
+Add these requirements to ensure proper SVG generation:
+- Center alignment for all SVG elements
+- Meaningful and clean SVG code
+- Proper color contrast and visibility
+- Font loading via both link and @font-face
+- Proper alignment and visual balance
+
+The final prompt should be highly detailed and technically precise while maintaining the original design intent."""
             },
             {
                 "role": "user",
@@ -136,177 +394,15 @@ Keep the response in natural language, focusing on professional and modern desig
         "max_tokens": 2000
     }
 
-    logger.info("Calling OpenAI API for design planning")
+    logger.info(f"Calling OpenAI Chat API for prompt enhancement with model: {PROMPT_ENHANCER_MODEL}")
     response = requests.post(url, headers=headers, json=payload)
     response_data = response.json()
 
     if response.status_code != 200:
-        logger.error(f"OpenAI API error in planning: {response_data}")
+        logger.error(f"OpenAI API error: {response_data}")
         raise Exception(f"OpenAI API error: {response_data.get('error', {}).get('message', 'Unknown error')}")
 
-    plan = response_data["choices"][0]["message"]["content"]
-    logger.info(f"Successfully created design plan: {plan[:200]}...")
-    return plan
-
-def generate_design_knowledge(design_plan):
-    """Generate specific design knowledge based on the plan"""
-    logger.info("Generating design knowledge based on plan")
-    
-    url = OPENAI_CHAT_ENDPOINT
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {OPENAI_API_KEY_SVG}"
-    }
-
-    system_prompt = """You are a design knowledge expert. Based on the provided design plan, generate specific design knowledge in plain text format. Include:
-
-1. Design principles and guidelines
-2. Color theory recommendations
-3. Typography suggestions
-4. Layout best practices
-5. Visual hierarchy tips
-6. Technical requirements
-7. Industry standards and trends
-
-Keep the response in natural language, avoiding technical formats."""
-
-    payload = {
-        "model": DESIGN_KNOWLEDGE_MODEL,
-        "messages": [
-            {
-                "role": "system",
-                "content": system_prompt
-            },
-            {
-                "role": "user",
-                "content": design_plan
-            }
-        ],
-        "temperature": 0.7,
-        "max_tokens": 2000
-    }
-
-    logger.info("Calling OpenAI API for design knowledge generation")
-    response = requests.post(url, headers=headers, json=payload)
-    response_data = response.json()
-
-    if response.status_code != 200:
-        logger.error(f"OpenAI API error in knowledge generation: {response_data}")
-        raise Exception(f"OpenAI API error: {response_data.get('error', {}).get('message', 'Unknown error')}")
-
-    knowledge = response_data["choices"][0]["message"]["content"]
-    logger.info(f"Successfully generated design knowledge: {knowledge[:200]}...")
-    return knowledge
-
-def pre_enhance_prompt(user_input, design_plan, design_knowledge):
-    """Initial enhancement of user query using design plan and knowledge"""
-    logger.info(f"Pre-enhancing prompt with design context")
-    
-    url = OPENAI_CHAT_ENDPOINT
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {OPENAI_API_KEY_SVG}"
-    }
-
-    system_prompt = """You are a prompt pre-enhancement expert. Using the provided design plan and knowledge:
-
-1. Analyze the user's request in context of the design plan
-2. Incorporate relevant design knowledge
-3. Structure the prompt to include:
-   - Design type and purpose
-   - Key visual elements
-   - Style and mood
-   - Technical requirements
-   - Specific design elements
-
-Focus on creating a clear, detailed foundation for further enhancement."""
-
-    payload = {
-        "model": PRE_ENHANCER_MODEL,
-        "messages": [
-            {
-                "role": "system",
-                "content": system_prompt
-            },
-            {
-                "role": "user",
-                "content": json.dumps({
-                    "user_input": user_input,
-                    "design_plan": design_plan,
-                    "design_knowledge": design_knowledge
-                })
-            }
-        ],
-        "temperature": 0.7,
-        "max_tokens": 2000
-    }
-
-    logger.info("Calling OpenAI API for prompt pre-enhancement")
-    response = requests.post(url, headers=headers, json=payload)
-    response_data = response.json()
-
-    if response.status_code != 200:
-        logger.error(f"OpenAI API error in pre-enhancement: {response_data}")
-        raise Exception(f"OpenAI API error: {response_data.get('error', {}).get('message', 'Unknown error')}")
-
-    pre_enhanced = response_data["choices"][0]["message"]["content"]
-    logger.info(f"Successfully pre-enhanced prompt: {pre_enhanced[:200]}...")
-    return pre_enhanced
-
-def enhance_prompt_with_chat(pre_enhanced_prompt, design_plan, design_knowledge):
-    """Final prompt enhancement incorporating all previous stages"""
-    logger.info("Performing final prompt enhancement")
-    
-    url = OPENAI_CHAT_ENDPOINT
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {OPENAI_API_KEY_SVG}"
-    }
-
-    system_prompt = """You are a final prompt enhancement expert. Your task is to:
-
-1. Refine and optimize the pre-enhanced prompt
-2. Ensure all design requirements are clearly specified
-3. Add specific details for:
-   - Layout and composition
-   - Color schemes and relationships
-   - Typography and text treatment
-   - Visual elements and their placement
-   - SVG-specific requirements
-
-Create a comprehensive prompt that will guide the image and SVG generation."""
-
-    payload = {
-        "model": PROMPT_ENHANCER_MODEL,
-        "messages": [
-            {
-                "role": "system",
-                "content": system_prompt
-            },
-            {
-                "role": "user",
-                "content": json.dumps({
-                    "pre_enhanced_prompt": pre_enhanced_prompt,
-                    "design_plan": design_plan,
-                    "design_knowledge": design_knowledge
-                })
-            }
-        ],
-        "temperature": 0.7,
-        "max_tokens": 2000
-    }
-
-    logger.info("Calling OpenAI API for final prompt enhancement")
-    response = requests.post(url, headers=headers, json=payload)
-    response_data = response.json()
-
-    if response.status_code != 200:
-        logger.error(f"OpenAI API error in final enhancement: {response_data}")
-        raise Exception(f"OpenAI API error: {response_data.get('error', {}).get('message', 'Unknown error')}")
-
-    enhanced = response_data["choices"][0]["message"]["content"]
-    logger.info(f"Successfully enhanced prompt: {enhanced[:200]}...")
-    return enhanced
+    return response_data["choices"][0]["message"]["content"]
 
 def generate_image_with_gpt(enhanced_prompt):
     """Generate image using GPT Image-1 model"""
@@ -327,65 +423,57 @@ def generate_image_with_gpt(enhanced_prompt):
         filename = save_image(image_base64, prefix="gpt_image")
         
         logger.info("Image generated and saved successfully with GPT Image-1")
-        return filename
+        return image_base64, filename
     except Exception as e:
         logger.error(f"Error generating image with GPT Image-1: {str(e)}")
         raise
 
-def generate_svg_from_image(image_path, enhanced_prompt):
-    """Generate SVG using Potrace based on image"""
-    logger.info("Starting SVG generation from image using Potrace")
+def generate_svg_from_image(image_base64, enhanced_prompt):
+    """Generate SVG code using vtracer from image"""
+    logger.info("Starting SVG generation from image using vtracer")
     
     try:
-        # Get full path to the image
-        input_image_path = os.path.join(IMAGES_DIR, image_path)
+        # Decode base64 image
+        image_bytes = base64.b64decode(image_base64)
+        image = Image.open(BytesIO(image_bytes))
         
-        # Load and preprocess the image
-        image = Image.open(input_image_path)
+        # Save temporary PNG file for vtracer
+        temp_png = os.path.join(IMAGES_DIR, f"temp_{uuid.uuid4()}.png")
+        image.save(temp_png, format="PNG")
         
-        # Convert to bitmap for potrace
-        bm = Bitmap(image, blacklevel=0.5)
+        # Generate output path for SVG
+        output_svg = os.path.join(IMAGES_DIR, f"output_{uuid.uuid4()}.svg")
         
-        # Trace the bitmap to get curves
-        plist = bm.trace(
-            turdsize=2,
-            turnpolicy=POTRACE_TURNPOLICY_MINORITY,
-            alphamax=1,
-            opticurve=True,
-            opttolerance=0.2,
+        # Convert image to SVG using vtracer with optimized settings
+        vtracer.convert_image_to_svg_py(
+            temp_png,
+            output_svg,
+            colormode='color',        # Use color mode for richer output
+            hierarchical='stacked',   # Use stacked mode for better layering
+            mode='spline',           # Use spline mode for smoother curves
+            filter_speckle=4,        # Remove small artifacts
+            color_precision=6,       # Good balance of color accuracy
+            layer_difference=16,     # Reasonable layer separation
+            corner_threshold=60,     # Balanced corner detection
+            length_threshold=4.0,    # Good detail preservation
+            max_iterations=10,       # Sufficient optimization
+            splice_threshold=45,     # Good path connection
+            path_precision=3         # Compact but accurate paths
         )
         
-        # Generate SVG content
-        width, height = image.size
-        svg_content = f'''<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="{width}" height="{height}" viewBox="0 0 {width} {height}">'''
+        # Read the generated SVG
+        with open(output_svg, 'r') as f:
+            svg_code = f.read()
+            
+        # Clean up temporary files
+        os.remove(temp_png)
+        os.remove(output_svg)
         
-        parts = []
-        for curve in plist:
-            fs = curve.start_point
-            parts.append(f"M{fs.x},{fs.y}")
-            for segment in curve.segments:
-                if segment.is_corner:
-                    a = segment.c
-                    b = segment.end_point
-                    parts.append(f"L{a.x},{a.y}L{b.x},{b.y}")
-                else:
-                    a = segment.c1
-                    b = segment.c2
-                    c = segment.end_point
-                    parts.append(f"C{a.x},{a.y} {b.x},{b.y} {c.x},{c.y}")
-            parts.append("z")
-        
-        svg_content += f'<path stroke="none" fill="black" fill-rule="evenodd" d="{"".join(parts)}"/>'
-        svg_content += "</svg>"
-        
-        # Save SVG content to a temporary file
-        svg_filename = save_svg(svg_content)
-        
-        logger.info(f"SVG generated successfully: {svg_filename}")
-        return svg_filename
+        logger.info("Successfully generated SVG using vtracer")
+        return svg_code
         
     except Exception as e:
-        logger.error(f"Error in SVG generation with Potrace: {str(e)}")
+        logger.error(f"Error in SVG generation with vtracer: {str(e)}")
         raise
 
 def clean_svg_code_original(svg_code):
@@ -485,73 +573,161 @@ def serve_image(filename):
 
 @app.route('/api/generate-svg', methods=['POST'])
 def generate_svg():
-    """Enhanced SVG generator endpoint with detailed workflow stages"""
+    """Universal SVG generator endpoint for any design request"""
     try:
         data = request.json
         user_input = data.get('prompt', '')
+        skip_enhancement = data.get('skip_enhancement', False)
 
         if not user_input:
             return jsonify({"error": "No prompt provided"}), 400
 
-        logger.info(f"Starting design generation process for: {user_input[:50]}...")
+        logger.info("="*80)
+        logger.info(f"Starting new design request: {user_input}")
+        logger.info("="*80)
+
+        # Stage 1: Check if prompt is suitable for SVG vector graphics
+        logger.info("\n[STAGE 1: Vector Suitability Check]")
+        logger.info("-"*50)
+        logger.info("Checking if design is suitable for SVG format...")
+        vector_suitability = check_vector_suitability(user_input)
+        logger.info("Vector suitability check complete")
+        logger.info(f"Result: {'Suitable' if not vector_suitability.get('not_suitable', False) else 'Not Suitable'}")
         
-        # Track progress for UI feedback
-        progress = {
-            "stage": "planning",
-            "progress": 0,
-            "message": "Creating design plan..."
-        }
+        if vector_suitability.get('not_suitable', False):
+            logger.warning("Design request not suitable for SVG format")
+            return jsonify({
+                "error": "Not suitable for SVG",
+                "guidance": vector_suitability.get('guidance', "Your request may not be ideal for SVG vector graphics. Please consider a simpler, more graphic design oriented request."),
+                "progress_stage": "vector_suitability",
+                "progress": 10
+            }), 400
+        
+        # Stage 2: Planning Phase - Create structured design plan
+        logger.info("\n[STAGE 2: Planning Phase]")
+        logger.info("-"*50)
+        logger.info("Creating structured design plan...")
+        logger.info(f"Using model: {PLANNER_MODEL}")
+        design_plan = plan_design(user_input)
+        logger.info("\nDesign Plan Generated:")
+        for line in design_plan.split('\n')[:10]:  # Log first 10 lines of plan
+            logger.info(f"  {line}")
+        logger.info("  ...")
+        
+        # Stage 3: Design Knowledge Generation - Gather design best practices
+        logger.info("\n[STAGE 3: Design Knowledge Generation]")
+        logger.info("-"*50)
+        logger.info("Gathering design knowledge and best practices...")
+        logger.info(f"Using model: {DESIGN_KNOWLEDGE_MODEL}")
+        design_knowledge = generate_design_knowledge(design_plan, user_input)
+        logger.info("\nDesign Knowledge Generated:")
+        for line in design_knowledge.split('\n')[:10]:  # Log first 10 lines of knowledge
+            logger.info(f"  {line}")
+        logger.info("  ...")
+        
+        # Combine design plan and knowledge for enhanced prompts
+        logger.info("\nCombining design plan and knowledge...")
+        design_context = f"""Design Plan:
+{design_plan}
 
-        # Step 1: Create Design Plan
-        design_plan = create_design_plan(user_input)
-        progress.update({"stage": "knowledge", "progress": 20, "message": "Generating design knowledge..."})
+Design Knowledge and Best Practices:
+{design_knowledge}
 
-        # Step 2: Generate Design Knowledge
-        design_knowledge = generate_design_knowledge(design_plan)
-        progress.update({"stage": "pre_enhancement", "progress": 40, "message": "Pre-enhancing prompt..."})
+Original Request:
+{user_input}"""
+        logger.info("Design context preparation complete")
+        
+        if skip_enhancement:
+            logger.info("\n[STAGES 4-5: Enhancement Phases SKIPPED]")
+            logger.info("-"*50)
+            logger.info("Using original prompt without enhancement")
+            prompt_to_use = user_input
+            pre_enhanced_prompt = user_input
+            enhanced_prompt = user_input
+        else:
+            # Stage 4: Pre-enhance the prompt with AI planning and design knowledge
+            logger.info("\n[STAGE 4: Pre-enhancement Phase]")
+            logger.info("-"*50)
+            logger.info("Pre-enhancing prompt with design context...")
+            logger.info(f"Using model: {PRE_ENHANCER_MODEL}")
+            pre_enhanced_prompt = pre_enhance_prompt(design_context)
+            logger.info("\nPre-enhanced Prompt Generated:")
+            for line in pre_enhanced_prompt.split('\n')[:10]:
+                logger.info(f"  {line}")
+            logger.info("  ...")
 
-        # Step 3: Pre-enhance Prompt
-        pre_enhanced_prompt = pre_enhance_prompt(user_input, design_plan, design_knowledge)
-        progress.update({"stage": "enhancement", "progress": 60, "message": "Enhancing prompt..."})
+            # Stage 5: Further enhance the prompt with technical specifications
+            logger.info("\n[STAGE 5: Prompt Enhancement Phase]")
+            logger.info("-"*50)
+            logger.info("Enhancing prompt with technical specifications...")
+            logger.info(f"Using model: {PROMPT_ENHANCER_MODEL}")
+            enhanced_prompt = enhance_prompt_with_chat(pre_enhanced_prompt)
+            logger.info("\nFinal Enhanced Prompt:")
+            for line in enhanced_prompt.split('\n')[:10]:
+                logger.info(f"  {line}")
+            logger.info("  ...")
+            
+            prompt_to_use = enhanced_prompt
 
-        # Step 4: Final Prompt Enhancement
-        enhanced_prompt = enhance_prompt_with_chat(pre_enhanced_prompt, design_plan, design_knowledge)
-        progress.update({"stage": "image_generation", "progress": 80, "message": "Generating image..."})
+        # Stage 6: Generate image using GPT Image-1
+        logger.info("STAGE 6: Image Generation Phase")
+        gpt_image_base64, gpt_image_filename = generate_image_with_gpt(prompt_to_use)
+        logger.info("Image generated with GPT Image-1")
 
-        # Step 5: Generate Image
-        image_path = generate_image_with_gpt(enhanced_prompt)
-        progress.update({"stage": "svg_generation", "progress": 90, "message": "Generating SVG..."})
-
-        # Step 6: Generate SVG
-        svg_path = generate_svg_from_image(image_path, enhanced_prompt)
-        progress.update({"stage": "complete", "progress": 100, "message": "Design complete!"})
-
+        # Stage 7: Generate SVG using vtracer
+        logger.info("STAGE 7: SVG Generation Phase")
+        svg_code = generate_svg_from_image(gpt_image_base64, prompt_to_use)
+        logger.info("SVG code generated from image")
+        
         # Save the SVG
-        svg_filename = save_svg(svg_path)
+        svg_filename = save_svg(svg_code, prefix="svg")
 
         return jsonify({
-            "design_plan": design_plan,
-            "design_knowledge": design_knowledge,
             "original_prompt": user_input,
             "pre_enhanced_prompt": pre_enhanced_prompt,
             "enhanced_prompt": enhanced_prompt,
-            "image_path": image_path,
-            "svg_path": svg_path,
+            "gpt_image_base64": gpt_image_base64,
+            "gpt_image_url": f"/static/images/{gpt_image_filename}",
+            "svg_code": svg_code,
             "svg_url": f"/static/images/{svg_filename}",
-            "progress": progress
+            "stages": {
+                "vector_suitability": {
+                    "completed": True,
+                    "suitable": True
+                },
+                "design_plan": {
+                    "completed": True,
+                    "content": design_plan if 'design_plan' in locals() else ""
+                },
+                "design_knowledge": {
+                    "completed": True, 
+                    "content": design_knowledge if 'design_knowledge' in locals() else ""
+                },
+                "pre_enhancement": {
+                    "completed": True,
+                    "skipped": skip_enhancement,
+                    "content": pre_enhanced_prompt
+                },
+                "prompt_enhancement": {
+                    "completed": True,
+                    "skipped": skip_enhancement,
+                    "content": enhanced_prompt
+                },
+                "image_generation": {
+                    "completed": True, 
+                    "image_url": f"/static/images/{gpt_image_filename}"
+                },
+                "svg_generation": {
+                    "completed": True, 
+                    "svg_url": f"/static/images/{svg_filename}"
+                }
+            },
+            "progress": 100
         })
 
     except Exception as e:
         logger.error(f"Error in generate_svg: {str(e)}")
-        logger.exception("Full traceback:")
-        return jsonify({
-            "error": str(e),
-            "progress": {
-                "stage": "error",
-                "progress": 0,
-                "message": f"Error: {str(e)}"
-            }
-        }), 500
+        return jsonify({"error": str(e)}), 500
 
 def chat_with_ai_about_design(messages, current_svg=None):
     """Enhanced conversational AI that can discuss and modify designs"""
@@ -560,7 +736,7 @@ def chat_with_ai_about_design(messages, current_svg=None):
     url = OPENAI_CHAT_ENDPOINT
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {OPENAI_API_KEY_SVG}"
+        "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
     }
 
     # Create system prompt that includes SVG knowledge
@@ -615,24 +791,28 @@ Current context: You are helping a user with their design project."""
                 "content": content
             })
 
-    payload = {
-        "model": CHAT_ASSISTANT_MODEL,
-        "messages": ai_messages,
-        "temperature": 0.7,
-        "max_tokens": 1000
-    }
-
-    logger.info(f"Calling conversational AI with {len(ai_messages)} messages")
-    response = requests.post(url, headers=headers, json=payload)
-    response_data = response.json()
-
-    if response.status_code != 200:
-        logger.error(f"Conversational AI error: {response_data}")
-        return "I'm sorry, I'm having trouble processing your request right now. Please try again."
-
-    ai_response = response_data["choices"][0]["message"]["content"]
-    logger.info(f"AI response generated: {ai_response[:100]}...")
-    return ai_response
+    try:
+        # Use OpenAI client directly instead of raw API calls
+        client = openai.OpenAI(api_key=OPENAI_API_KEY_ENHANCER)
+        response = client.chat.completions.create(
+            model=CHAT_ASSISTANT_MODEL,
+            messages=ai_messages,
+            temperature=0.7,
+            max_tokens=1000
+        )
+        
+        # Extract the response content safely
+        if response and response.choices and len(response.choices) > 0:
+            ai_response = response.choices[0].message.content
+            logger.info(f"AI response generated: {ai_response[:100]}...")
+            return ai_response
+        else:
+            logger.error("Empty or invalid response from OpenAI")
+            return "I apologize, but I'm having trouble generating a response. Could you please rephrase your request?"
+            
+    except Exception as e:
+        logger.error(f"Error in chat_with_ai_about_design: {str(e)}")
+        return "I apologize, but I encountered an error while processing your request. Please try again."
 
 def modify_svg_with_ai(original_svg, modification_request):
     """Use AI to modify an existing SVG based on user request"""
@@ -699,7 +879,9 @@ def chat_assistant():
         data = request.json
         messages = data.get('messages', [])
         
-        logger.info("Received chat request")
+        logger.info("="*80)
+        logger.info("CHAT ASSISTANT REQUEST")
+        logger.info("="*80)
         logger.info(f"Chat history length: {len(messages)}")
         logger.info(f"Last message: {messages[-1] if messages else 'No messages'}")
         
@@ -710,58 +892,201 @@ def chat_assistant():
         # Get the latest user message
         latest_message = messages[-1]["content"].lower() if messages else ""
         
-        logger.info("Processing new design creation request")
+        # Analyze request type
+        logger.info("\n[Request Analysis]")
+        logger.info("-"*50)
+        
+        # Check request type
+        is_create_request = any(keyword in latest_message for keyword in [
+            "create", "design", "generate", "make", "draw", "poster", "build"
+        ]) and not any(word in latest_message for word in ["edit", "update", "modify", "change"])
+
+        is_modify_request = any(word in latest_message for word in ["edit", "update", "modify", "change", "adjust"]) and any(keyword in latest_message for keyword in ["design", "poster", "color", "text", "font", "size"])
+
+        logger.info(f"Request type: {'Creation' if is_create_request else 'Modification' if is_modify_request else 'Conversation'}")
+        logger.info(f"User message: {latest_message}")
+
+        # Find existing SVG if any
+        current_svg = None
+        for msg in reversed(messages):
+            if msg.get("role") == "assistant" and "```svg" in msg.get("content", ""):
+                svg_start = msg["content"].find("```svg") + 6
+                svg_end = msg["content"].find("```", svg_start)
+                if svg_end > svg_start:
+                    current_svg = msg["content"][svg_start:svg_end].strip()
+                    logger.info("Found existing SVG in conversation")
+                    break
+
+        if is_create_request:
+            logger.info("\n[Starting New Design Creation]")
+            logger.info("-"*50)
             
-        # Step 1: Create design plan
-        design_plan = create_design_plan(latest_message)
-        logger.info("Design Plan Generated")
+            try:
+                # Stage 1: Planning Phase
+                logger.info("\n[STAGE 1: Planning Phase]")
+                logger.info("-"*50)
+                logger.info("Creating structured design plan...")
+                logger.info(f"Using model: {PLANNER_MODEL}")
+                design_plan = plan_design(latest_message)
+                logger.info("\nDesign Plan Generated:")
+                for line in design_plan.split('\n')[:10]:
+                    logger.info(f"  {line}")
+                logger.info("  ...")
 
-        # Step 2: Generate design knowledge
-        design_knowledge = generate_design_knowledge(design_plan)
-        logger.info("Design Knowledge Generated")
+                # Stage 2: Design Knowledge Generation
+                logger.info("\n[STAGE 2: Design Knowledge Generation]")
+                logger.info("-"*50)
+                logger.info("Gathering design knowledge and best practices...")
+                logger.info(f"Using model: {DESIGN_KNOWLEDGE_MODEL}")
+                design_knowledge = generate_design_knowledge(design_plan, latest_message)
+                logger.info("\nDesign Knowledge Generated:")
+                for line in design_knowledge.split('\n')[:10]:
+                    logger.info(f"  {line}")
+                logger.info("  ...")
 
-        # Step 3: Pre-enhance prompt
-        pre_enhanced_prompt = pre_enhance_prompt(latest_message, design_plan, design_knowledge)
-        logger.info("Pre-enhanced Prompt Created")
+                # Stage 3: Pre-enhancement
+                logger.info("\n[STAGE 3: Pre-enhancement Phase]")
+                logger.info("-"*50)
+                logger.info("Pre-enhancing prompt with design context...")
+                logger.info(f"Using model: {PRE_ENHANCER_MODEL}")
+                design_context = f"""Design Plan:\n{design_plan}\n\nDesign Knowledge:\n{design_knowledge}\n\nOriginal Request:\n{latest_message}"""
+                pre_enhanced = pre_enhance_prompt(design_context)
+                logger.info("\nPre-enhanced Prompt:")
+                for line in pre_enhanced.split('\n')[:10]:
+                    logger.info(f"  {line}")
+                logger.info("  ...")
 
-        # Step 4: Final prompt enhancement
-        enhanced_prompt = enhance_prompt_with_chat(pre_enhanced_prompt, design_plan, design_knowledge)
-        logger.info("Enhanced Prompt Generated")
+                # Stage 4: Final Enhancement
+                logger.info("\n[STAGE 4: Final Enhancement Phase]")
+                logger.info("-"*50)
+                logger.info("Enhancing prompt with technical specifications...")
+                logger.info(f"Using model: {PROMPT_ENHANCER_MODEL}")
+                enhanced_prompt = enhance_prompt_with_chat(pre_enhanced)
+                logger.info("\nEnhanced Prompt Generated:")
+                for line in enhanced_prompt.split('\n')[:10]:
+                    logger.info(f"  {line}")
+                logger.info("  ...")
+                
+                # Stage 5: Image Generation
+                logger.info("\n[STAGE 5: Image Generation]")
+                logger.info("-"*50)
+                logger.info("Generating initial design image...")
+                logger.info(f"Using model: {GPT_IMAGE_MODEL}")
+                image_base64, image_filename = generate_image_with_gpt(enhanced_prompt)
+                logger.info(f"Image generated and saved as: {image_filename}")
+                
+                # Stage 6: SVG Generation
+                logger.info("\n[STAGE 6: SVG Generation]")
+                logger.info("-"*50)
+                logger.info("Converting design to SVG format...")
+                logger.info(f"Using model: {SVG_GENERATOR_MODEL}")
+                svg_code = generate_svg_from_image(image_base64, enhanced_prompt)
+                svg_filename = save_svg(svg_code, prefix="assistant_svg")
+                logger.info(f"SVG generated and saved as: {svg_filename}")
+                
+                # Stage 7: Design Explanation
+                logger.info("\n[STAGE 7: Design Explanation]")
+                logger.info("-"*50)
+                logger.info("Generating design explanation...")
+                logger.info(f"Using model: {CHAT_ASSISTANT_MODEL}")
+                
+                explanation_prompt = f"I've created a design for the user. Here's the SVG code:\n\n```svg\n{svg_code}\n```\n\nPlease explain this design to the user in a friendly, conversational way. Describe the elements, colors, layout, and how it addresses their request."
+                
+                temp_messages = messages + [{"role": "user", "content": explanation_prompt}]
+                ai_explanation = chat_with_ai_about_design(temp_messages, svg_code)
+                
+                logger.info("\nExplanation Generated:")
+                for line in ai_explanation.split('\n')[:5]:
+                    logger.info(f"  {line}")
+                logger.info("  ...")
+                
+                # Create comprehensive response
+                full_response = f"{ai_explanation}\n\n```svg\n{svg_code}\n```\n\nFeel free to ask me to modify any aspect of this design!"
+                
+                messages.append({"role": "assistant", "content": full_response})
+                
+                response_data = {
+                    "messages": messages,
+                    "svg_code": svg_code,
+                    "svg_url": f"/static/images/{svg_filename}"
+                }
+                
+                logger.info("\n[Design Creation Complete]")
+                logger.info("="*80)
+                logger.info("Summary:")
+                logger.info(f"- Design plan created")
+                logger.info(f"- Design knowledge gathered")
+                logger.info(f"- Prompt enhanced and refined")
+                logger.info(f"- Image generated: {image_filename}")
+                logger.info(f"- SVG created: {svg_filename}")
+                logger.info(f"- Explanation provided")
+                logger.info("="*80)
+                
+                return jsonify(response_data)
+                
+            except Exception as e:
+                logger.error(f"Error in design creation: {str(e)}")
+                error_response = "I encountered an error while creating the design. Let me try a different approach or you can rephrase your request."
+                messages.append({"role": "assistant", "content": error_response})
+                return jsonify({"messages": messages})
 
-        # Step 5: Generate initial image
-        image_filename = generate_image_with_gpt(enhanced_prompt)
-        logger.info(f"Image generated: {image_filename}")
+        elif is_modify_request and current_svg:
+            logger.info("Processing design modification request")
+            
+            try:
+                # Modify the existing SVG
+                modified_svg = modify_svg_with_ai(current_svg, latest_message)
+                
+                if modified_svg and modified_svg != current_svg:
+                    # Save the modified SVG
+                    svg_filename = save_svg(modified_svg, prefix="modified_svg")
+                    
+                    # Get AI explanation of the changes
+                    change_explanation_prompt = f"I've modified the design based on the user's request: '{latest_message}'. Here's the updated SVG:\n\n```svg\n{modified_svg}\n```\n\nPlease explain what changes were made and how the design now better meets their needs."
+                    
+                    temp_messages = messages + [{"role": "user", "content": change_explanation_prompt}]
+                    ai_explanation = chat_with_ai_about_design(temp_messages, modified_svg)
+                    
+                    full_response = f"{ai_explanation}\n\n```svg\n{modified_svg}\n```\n\nIs there anything else you'd like me to adjust?"
+                    
+                    messages.append({"role": "assistant", "content": full_response})
+                    
+                    response_data = {
+                        "messages": messages,
+                        "svg_code": modified_svg,
+                        "svg_url": f"/static/images/{svg_filename}"
+                    }
+                    logger.info("Successfully modified design with explanation")
+                    return jsonify(response_data)
+                else:
+                    # Fallback to conversational response
+                    ai_response = chat_with_ai_about_design(messages, current_svg)
+                    messages.append({"role": "assistant", "content": ai_response})
+                    return jsonify({"messages": messages})
+                    
+            except Exception as e:
+                logger.error(f"Error in design modification: {str(e)}")
+                ai_response = "I had trouble modifying the design. Could you be more specific about what changes you'd like me to make?"
+                messages.append({"role": "assistant", "content": ai_response})
+                return jsonify({"messages": messages})
 
-        # Step 6: Generate SVG from image
-        svg_path = generate_svg_from_image(image_filename, enhanced_prompt)
-        svg_filename = save_svg(svg_path)
-        logger.info(f"SVG generated: {svg_filename}")
-
-        # Step 7: Generate explanation
-        explanation = chat_with_ai_about_design(messages + [{"role": "assistant", "content": svg_path}])
-        logger.info("Explanation Generated")
-
-        return jsonify({
-            "response": explanation,
-            "svg_path": svg_path,
-            "image": image_filename,
-            "progress": {
-                "stage": "complete",
-                "progress": 100,
-                "message": "Design complete!"
-            }
-        })
+        else:
+            # Handle general conversation
+            logger.info("Processing general conversation")
+            ai_response = chat_with_ai_about_design(messages, current_svg)
+            messages.append({"role": "assistant", "content": ai_response})
+            
+            return jsonify({
+                "messages": messages,
+                "svg_code": current_svg,
+                "svg_url": None
+            })
             
     except Exception as e:
-        logger.error(f"Error in design creation: {str(e)}")
-        return jsonify({
-            "error": str(e),
-            "progress": {
-                "stage": "error",
-                "progress": 0,
-                "message": f"Error: {str(e)}"
-            }
-        }), 500
+        error_msg = f"Error in chat_assistant: {str(e)}"
+        logger.error(error_msg)
+        logger.exception("Full traceback:")
+        return jsonify({"error": error_msg}), 500
 
 if __name__ == '__main__':
     # Get port from environment variable (Render sets PORT=8000)
