@@ -6,5 +6,4 @@ pillow
 openai
 python-dotenv
 gunicorn
-numpy
-pypotrace
+vtracer
