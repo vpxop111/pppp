@@ -29,7 +29,8 @@ CORS(app,
          'http://127.0.0.1:3001',
          'https://pppp-351z.onrender.com',
          'https://infoui.vercel.app',
-         'https://infoui.vercel.app/'
+         'https://infoui.vercel.app/',
+         'https://infoui-git-main-varuns-projects-859429fc.vercel.app/'
      ],
      methods=['GET', 'POST', 'OPTIONS'],
      allow_headers=['Content-Type', 'Authorization'],
@@ -689,7 +690,7 @@ Original Request:
             "gpt_image_base64": gpt_image_base64,
             "gpt_image_url": f"/static/images/{gpt_image_filename}",
             "svg_code": svg_code,
-            "svg_url": f"/static/images/{svg_filename}",
+            "svg_path": svg_filename,
             "stages": {
                 "vector_suitability": {
                     "completed": True,
@@ -719,7 +720,7 @@ Original Request:
                 },
                 "svg_generation": {
                     "completed": True, 
-                    "svg_url": f"/static/images/{svg_filename}"
+                    "svg_path": svg_filename
                 }
             },
             "progress": 100
@@ -1006,9 +1007,10 @@ def chat_assistant():
                 messages.append({"role": "assistant", "content": full_response})
                 
                 response_data = {
-                    "messages": messages,
+                    "response": full_response,
                     "svg_code": svg_code,
-                    "svg_url": f"/static/images/{svg_filename}"
+                    "svg_path": svg_filename,
+                    "messages": messages
                 }
                 
                 logger.info("\n[Design Creation Complete]")
@@ -1052,9 +1054,10 @@ def chat_assistant():
                     messages.append({"role": "assistant", "content": full_response})
                     
                     response_data = {
-                        "messages": messages,
+                        "response": full_response,
                         "svg_code": modified_svg,
-                        "svg_url": f"/static/images/{svg_filename}"
+                        "svg_path": svg_filename,
+                        "messages": messages
                     }
                     logger.info("Successfully modified design with explanation")
                     return jsonify(response_data)
@@ -1079,7 +1082,8 @@ def chat_assistant():
             return jsonify({
                 "messages": messages,
                 "svg_code": current_svg,
-                "svg_url": None
+                "svg_path": None,
+                "response": ai_response
             })
             
     except Exception as e:
