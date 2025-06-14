@@ -19,6 +19,7 @@ import pytesseract
 import numpy as np
 import remove_text_simple
 import png_to_svg_converter
+from parallel_svg_pipeline import generate_parallel_svg_pipeline, init_parallel_pipeline
 
 # Load environment variables
 load_dotenv()
@@ -86,6 +87,9 @@ PROMPT_ENHANCER_MODEL = "gpt-4.1-nano"
 GPT_IMAGE_MODEL = "gpt-image-1"
 SVG_GENERATOR_MODEL = "gpt-4.1-nano"
 CHAT_ASSISTANT_MODEL = "gpt-4.1-nano"
+
+# Initialize parallel pipeline with our images directory
+init_parallel_pipeline(IMAGES_DIR)
 
 def check_vector_suitability(user_input):
     """Check if the prompt is suitable for SVG vector graphics"""
@@ -1363,71 +1367,24 @@ def process_simple_conversion(image_base64):
             'error': str(e)
         }
 
-@app.route('/api/parallel-svg', methods=['POST'])
+@app.route('/api/generate-parallel-svg', methods=['POST'])
 def generate_parallel_svg():
-    """Generate SVG using multiple parallel techniques"""
-    data = request.json or {}
-    user_input = data.get('prompt', '')
-    skip_enhancement = data.get('skip_enhancement', False)
-    
-    if not user_input:
-        return jsonify({'error': 'No prompt provided'}), 400
-        
-    logger.info('=== PARALLEL SVG PIPELINE START ===')
-    
-    # Stage 1: Vector Suitability Check
-    logger.info('\n[STAGE 1: Vector Suitability]')
-    logger.info('--------------------------------------------------')
-    vector_suitability = check_vector_suitability(user_input)
-    if vector_suitability.get('not_suitable', False):
-        return jsonify({
-            'error': 'Not suitable for SVG',
-            'guidance': vector_suitability.get('guidance'),
-            'stage': 1
-        }), 400
-        
-    # Stage 2: Design Planning
-    logger.info('\n[STAGE 2: Design Planning]')
-    logger.info('--------------------------------------------------')
-    design_plan = plan_design(user_input)
-    
-    # Stage 3: Design Knowledge
-    logger.info('\n[STAGE 3: Design Knowledge]')
-    logger.info('--------------------------------------------------')
-    design_knowledge = generate_design_knowledge(design_plan, user_input)
-    
-    # Prepare context for enhancements
-    design_context = f"""Design Plan:\n{design_plan}\n\nDesign Knowledge and Best Practices:\n{design_knowledge}\n\nOriginal Request:\n{user_input}"""
-    
-    # Stage 4 & 5: Prompt Enhancement
-    if skip_enhancement:
-        enhanced_prompt = user_input
-    else:
-        logger.info('\n[STAGE 4: Pre-Enhancement]')
-        logger.info('--------------------------------------------------')
-        pre = pre_enhance_prompt(design_context)
-        logger.info('\n[STAGE 5: Technical Enhancement]')
-        logger.info('--------------------------------------------------')
-        enhanced_prompt = enhance_prompt_with_chat(pre)
-        
-    # Stage 6: Image Generation
-    logger.info('\n[STAGE 6: Image Generation]')
-    logger.info('--------------------------------------------------')
-    image_base64, image_filename = generate_image_with_gpt(enhanced_prompt)
-    
-    # Stage 7: Parallel SVG Processing
-    logger.info('\n[STAGE 7: Parallel SVG Processing]')
-    logger.info('--------------------------------------------------')
-    results = process_image_parallel(image_base64, enhanced_prompt)
-    
-    return jsonify({
-        'original_prompt': user_input,
-        'image_url': f'/static/images/{image_filename}',
-        'vtracer_result': results['vtracer'],
-        'text_result': results['text'],
-        'simple_result': results['simple'],
-        'stage': 7
-    })
+    """Generate SVG using parallel pipeline"""
+    try:
+        data = request.json or {}
+        user_input = data.get('prompt', '')
+        skip_enhancement = data.get('skip_enhancement', False)
+
+        if not user_input:
+            return jsonify({'error': 'No prompt provided'}), 400
+
+        # Call the parallel SVG pipeline
+        result = generate_parallel_svg_pipeline(user_input, skip_enhancement, IMAGES_DIR)
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"Error in parallel SVG generation: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     # Get port from environment variable (Render sets PORT=8000)

@@ -26,10 +26,18 @@ import png_to_svg_converter
 from openai import OpenAI
 import requests
 import re
+import logging
 
-# Directory for parallel pipeline outputs
-PARALLEL_OUTPUTS_DIR = os.path.join(IMAGES_DIR, 'parallel')
-os.makedirs(PARALLEL_OUTPUTS_DIR, exist_ok=True)
+# Configure logging
+logger = logging.getLogger(__name__)
+
+def init_parallel_pipeline(images_dir):
+    """Initialize parallel pipeline with the given images directory"""
+    global IMAGES_DIR, PARALLEL_OUTPUTS_DIR
+    IMAGES_DIR = images_dir
+    PARALLEL_OUTPUTS_DIR = os.path.join(IMAGES_DIR, 'parallel')
+    os.makedirs(PARALLEL_OUTPUTS_DIR, exist_ok=True)
+    return PARALLEL_OUTPUTS_DIR
 
 # Instantiate a GPT client for chat completions
 chat_client = OpenAI()
@@ -499,37 +507,23 @@ def simple_combine_svgs(text_svg_code, traced_svg_code):
     logger.info(f'Stage 8.13: Advanced combination completed - Final size: {len(combined_svg)} characters')
     return combined_svg
 
-@app.route('/api/generate-parallel-svg', methods=['POST'])
-def generate_parallel_svg():
+def generate_parallel_svg_pipeline(user_input, skip_enhancement=False, images_dir=None):
     """Pipeline: Stages 1-6 image gen, then parallel Stage 7: OCR+SVG and Clean SVG generation"""
-    data = request.json or {}
-    user_input = data.get('prompt', '')
-    skip_enhancement = data.get('skip_enhancement', False)
+    if images_dir:
+        init_parallel_pipeline(images_dir)
 
     if not user_input:
-        return jsonify({'error': 'No prompt provided'}), 400
+        raise ValueError('No prompt provided')
 
     logger.info('=== PARALLEL SVG PIPELINE START ===')
 
-    # Stage 2: Design Planning
-    logger.info('Stage 2: Design Planning')
-    design_plan = plan_design(user_input)
-
-    # Stage 3: Design Knowledge Generation
-    logger.info('Stage 3: Design Knowledge Generation')
-    design_knowledge = generate_design_knowledge(design_plan, user_input)
-
-    # Prepare context for enhancements
-    design_context = f"""Design Plan:\n{design_plan}\n\nDesign Knowledge and Best Practices:\n{design_knowledge}\n\nOriginal Request:\n{user_input}"""
-
-    # Stages 4 & 5 skipped: Prompt Enhancements removed
     # Build an advanced image prompt optimized for parallel SVG processing
-    image_prompt = build_advanced_image_prompt(user_input, design_context)
+    image_prompt = build_advanced_image_prompt(user_input, None)
 
     # Stage 6: Image Generation via GPT-Image using enhanced prompt
     logger.info('Stage 6: Image Generation via GPT-Image with enhanced prompt')
     logger.debug(f'Image prompt: {image_prompt[:200]}...')
-    image_base64, image_filename = generate_image_with_gpt(image_prompt, design_context)
+    image_base64, image_filename = generate_image_with_gpt(image_prompt)
     image_data = base64.b64decode(image_base64)
 
     # Stage 7: Parallel Processing
@@ -594,7 +588,7 @@ def generate_parallel_svg():
     clean_svg_url = f"{base_url}/{session_folder}/{os.path.basename(clean_svg_path)}"
     combined_svg_url = f"{base_url}/{session_folder}/{combined_svg_filename}"
 
-    return jsonify({
+    return {
         'original_prompt': user_input,
         'image_url': image_url,
         'edited_png': {
@@ -615,7 +609,7 @@ def generate_parallel_svg():
             'url': combined_svg_url
         },
         'stage': 8
-    })
+    }
 
 @app.route('/')
 def home():
