@@ -3,6 +3,7 @@ requests
 flask-cors
 cairosvg
 pillow
+pytesseract
 openai
 python-dotenv
 gunicorn
