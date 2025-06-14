@@ -8,53 +8,66 @@ from PIL import Image
 import openai
 import requests
 import re
+import sys
+import traceback
 from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('app.log'),
-        logging.StreamHandler()
-    ]
+    stream=sys.stdout  # Ensure logs go to stdout for Render
 )
 logger = logging.getLogger(__name__)
 
-# Directory setup
-STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
-IMAGES_DIR = os.path.join(STATIC_DIR, 'images')
-os.makedirs(IMAGES_DIR, exist_ok=True)
+try:
+    # Load environment variables
+    load_dotenv()
 
-# Directory for parallel pipeline outputs
-PARALLEL_OUTPUTS_DIR = os.path.join(IMAGES_DIR, 'parallel')
-os.makedirs(PARALLEL_OUTPUTS_DIR, exist_ok=True)
+    # Directory setup
+    STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
+    IMAGES_DIR = os.path.join(STATIC_DIR, 'images')
+    
+    # Create directories if they don't exist
+    os.makedirs(STATIC_DIR, exist_ok=True)
+    os.makedirs(IMAGES_DIR, exist_ok=True)
 
-# API keys
-OPENAI_API_KEY_ENHANCER = os.getenv('OPENAI_API_KEY_ENHANCER')
-OPENAI_API_KEY_SVG = os.getenv('OPENAI_API_KEY_SVG')
+    # Directory for parallel pipeline outputs
+    PARALLEL_OUTPUTS_DIR = os.path.join(IMAGES_DIR, 'parallel')
+    os.makedirs(PARALLEL_OUTPUTS_DIR, exist_ok=True)
 
-if not OPENAI_API_KEY_ENHANCER or not OPENAI_API_KEY_SVG:
-    raise ValueError("OpenAI API keys must be set in environment variables")
+    logger.info("Directory setup completed successfully")
+    logger.info(f"STATIC_DIR: {STATIC_DIR}")
+    logger.info(f"IMAGES_DIR: {IMAGES_DIR}")
+    logger.info(f"PARALLEL_OUTPUTS_DIR: {PARALLEL_OUTPUTS_DIR}")
 
-# OpenAI client setup
-openai.api_key = OPENAI_API_KEY_SVG
+    # API keys
+    OPENAI_API_KEY_ENHANCER = os.getenv('OPENAI_API_KEY_ENHANCER')
+    OPENAI_API_KEY_SVG = os.getenv('OPENAI_API_KEY_SVG')
 
-# OpenAI API Endpoints
-OPENAI_API_BASE = "https://api.openai.com/v1"
-OPENAI_CHAT_ENDPOINT = f"{OPENAI_API_BASE}/chat/completions"
+    if not OPENAI_API_KEY_ENHANCER or not OPENAI_API_KEY_SVG:
+        raise ValueError("OpenAI API keys must be set in environment variables")
 
-# Model names
-PLANNER_MODEL = "gpt-4.1-nano"
-DESIGN_KNOWLEDGE_MODEL = "gpt-4.1-nano"
-PRE_ENHANCER_MODEL = "gpt-4.1-nano"
-PROMPT_ENHANCER_MODEL = "gpt-4.1-nano"
-GPT_IMAGE_MODEL = "gpt-image-1"
-SVG_GENERATOR_MODEL = "gpt-4.1-nano"
-CHAT_ASSISTANT_MODEL = "gpt-4.1-nano"
+    # OpenAI client setup
+    openai.api_key = OPENAI_API_KEY_SVG
+
+    # OpenAI API Endpoints
+    OPENAI_API_BASE = "https://api.openai.com/v1"
+    OPENAI_CHAT_ENDPOINT = f"{OPENAI_API_BASE}/chat/completions"
+
+    # Model names
+    PLANNER_MODEL = "gpt-4.1-nano"
+    DESIGN_KNOWLEDGE_MODEL = "gpt-4.1-nano"
+    PRE_ENHANCER_MODEL = "gpt-4.1-nano"
+    PROMPT_ENHANCER_MODEL = "gpt-4.1-nano"
+    GPT_IMAGE_MODEL = "gpt-image-1"
+    SVG_GENERATOR_MODEL = "gpt-4.1-nano"
+    CHAT_ASSISTANT_MODEL = "gpt-4.1-nano"
+
+except Exception as e:
+    logger.error(f"Failed to initialize utils: {str(e)}")
+    logger.error(traceback.format_exc())
+    sys.exit(1)
 
 def save_image(image_data, prefix="img", format="PNG"):
     """Save image data to file and return the filename"""
@@ -74,6 +87,7 @@ def save_image(image_data, prefix="img", format="PNG"):
         return filename
     except Exception as e:
         logger.error(f"Error saving image: {str(e)}")
+        logger.error(traceback.format_exc())
         raise
 
 def save_svg(svg_code, prefix="svg"):
@@ -93,6 +107,7 @@ def save_svg(svg_code, prefix="svg"):
         return filename
     except Exception as e:
         logger.error(f"Error saving SVG: {str(e)}")
+        logger.error(traceback.format_exc())
         raise
 
 def generate_image_with_gpt(enhanced_prompt, design_context=None):
@@ -121,4 +136,5 @@ def generate_image_with_gpt(enhanced_prompt, design_context=None):
         return image_base64, filename
     except Exception as e:
         logger.error(f"Error generating image with GPT Image-1: {str(e)}")
+        logger.error(traceback.format_exc())
         raise 

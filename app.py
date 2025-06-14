@@ -1,5 +1,7 @@
 from flask import Flask, request, jsonify, send_from_directory
 import os
+import sys
+import traceback
 import requests
 import json
 import logging
@@ -32,6 +34,23 @@ from image_to_text_svg_pipeline import generate_image_text_svg
 
 # Load environment variables
 load_dotenv()
+
+# Configure basic logging first
+import logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    stream=sys.stdout  # Ensure logs go to stdout for Render
+)
+logger = logging.getLogger(__name__)
+
+try:
+    # Initialize parallel pipeline
+    init_parallel_pipeline()
+except Exception as e:
+    logger.error(f"Failed to initialize parallel pipeline: {str(e)}")
+    logger.error(traceback.format_exc())
+    sys.exit(1)
 
 app = Flask(__name__)
 
@@ -96,9 +115,6 @@ PROMPT_ENHANCER_MODEL = "gpt-4.1-nano"
 GPT_IMAGE_MODEL = "gpt-image-1"
 SVG_GENERATOR_MODEL = "gpt-4.1-nano"
 CHAT_ASSISTANT_MODEL = "gpt-4.1-nano"
-
-# Initialize parallel pipeline with our images directory
-init_parallel_pipeline(IMAGES_DIR)
 
 def check_vector_suitability(user_input):
     """Check if the prompt is suitable for SVG vector graphics"""
@@ -1345,11 +1361,27 @@ def handle_parallel_svg():
         return jsonify(result)
     except Exception as e:
         logger.error(f"Error in parallel SVG handler: {str(e)}")
+        logger.error(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
 
+@app.route('/health')
+def health_check():
+    """Health check endpoint"""
+    return jsonify({'status': 'healthy'}), 200
+
 if __name__ == '__main__':
-    # Get port from environment variable for deployment
-    port = int(os.environ.get('PORT', 5000))
-    # Use 0.0.0.0 when PORT env var is set (deployment)
-    host = '0.0.0.0' if 'PORT' in os.environ else '127.0.0.1'
-    app.run(host=host, port=port, debug=True)
+    try:
+        # Get port from environment variable for deployment
+        port = int(os.environ.get('PORT', 5000))
+        # Use 0.0.0.0 when PORT env var is set (deployment)
+        host = '0.0.0.0' if 'PORT' in os.environ else '127.0.0.1'
+        
+        logger.info(f"Starting Flask app on {host}:{port}")
+        logger.info(f"Static directory: {STATIC_DIR}")
+        logger.info(f"Images directory: {IMAGES_DIR}")
+        
+        app.run(host=host, port=port)
+    except Exception as e:
+        logger.error(f"Failed to start Flask app: {str(e)}")
+        logger.error(traceback.format_exc())
+        sys.exit(1)

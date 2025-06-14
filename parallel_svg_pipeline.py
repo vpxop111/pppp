@@ -32,14 +32,31 @@ from utils import (
     save_image,
     generate_image_with_gpt
 )
+import sys
+import traceback
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
 def init_parallel_pipeline():
     """Initialize the parallel SVG pipeline"""
-    logger.info("Initializing parallel SVG pipeline")
-    return True
+    try:
+        logger.info("Initializing parallel SVG pipeline")
+        # Verify vtracer is available
+        if not hasattr(vtracer, 'convert_image_to_svg_path'):
+            raise ImportError("vtracer module is missing required function")
+        
+        # Verify directories exist
+        if not os.path.exists(PARALLEL_OUTPUTS_DIR):
+            os.makedirs(PARALLEL_OUTPUTS_DIR, exist_ok=True)
+            logger.info(f"Created PARALLEL_OUTPUTS_DIR: {PARALLEL_OUTPUTS_DIR}")
+        
+        logger.info("Parallel SVG pipeline initialized successfully")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to initialize parallel SVG pipeline: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise
 
 # Instantiate a GPT client for chat completions
 chat_client = OpenAI()
@@ -519,9 +536,11 @@ def generate_parallel_svg_pipeline(data):
             return jsonify({'error': 'No prompt provided'}), 400
 
         logger.info('=== PARALLEL SVG PIPELINE START ===')
+        logger.info(f'Processing prompt: {user_input[:100]}...')
 
         # Generate image using GPT
         image_base64, image_filename = generate_image_with_gpt(user_input)
+        logger.info(f'Image generated: {image_filename}')
 
         # Save the image for vtracer processing
         image_data = base64.b64decode(image_base64)
@@ -531,6 +550,7 @@ def generate_parallel_svg_pipeline(data):
         
         with open(input_filepath, "wb") as f:
             f.write(image_data)
+        logger.info(f'Input image saved: {input_filepath}')
 
         # Process with vtracer
         output_svg = f"parallel_output_{timestamp}_{uuid.uuid4().hex[:8]}.svg"
@@ -546,11 +566,13 @@ def generate_parallel_svg_pipeline(data):
             path_precision=8,
         )
         
+        logger.info('Starting vtracer conversion...')
         vtracer.convert_image_to_svg_path(
             input_filepath,
             output_filepath,
             config
         )
+        logger.info(f'Vtracer conversion complete: {output_filepath}')
 
         # Read the generated SVG
         with open(output_filepath, 'r') as f:
@@ -558,6 +580,7 @@ def generate_parallel_svg_pipeline(data):
 
         # Save final SVG and return
         svg_filename = save_svg(svg_code, prefix='parallel_svg')
+        logger.info(f'Final SVG saved: {svg_filename}')
         
         return {
             'original_prompt': user_input,
@@ -569,6 +592,7 @@ def generate_parallel_svg_pipeline(data):
 
     except Exception as e:
         logger.error(f"Error in parallel SVG pipeline: {str(e)}")
+        logger.error(traceback.format_exc())
         return {'error': str(e), 'stage': 'failed'}, 500
 
 @app.route('/')
