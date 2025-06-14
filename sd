@@ -1,0 +1,118 @@
+from flask import request, jsonify
+from app import (
+    app,
+    check_vector_suitability,
+    plan_design,
+    generate_design_knowledge,
+    pre_enhance_prompt,
+    enhance_prompt_with_chat,
+    generate_image_with_gpt,
+    save_svg,
+    logger,
+    OPENAI_CHAT_ENDPOINT,
+    OPENAI_API_KEY_ENHANCER,
+    SVG_GENERATOR_MODEL
+)
+import base64
+from io import BytesIO
+from PIL import Image
+import requests
+import re
+
+@app.route('/api/generate-text-svg', methods=['POST'])
+def generate_image_text_svg():
+    """Pipeline: Stages 1–6 image gen, then Stage 7: text OCR & SVG generation"""
+    data = request.json or {}
+    user_input = data.get('prompt', '')
+    skip_enhancement = data.get('skip_enhancement', False)
+
+    if not user_input:
+        return jsonify({'error': 'No prompt provided'}), 400
+
+    logger.info('=== IMAGE→TEXT→SVG PIPELINE START ===')
+
+    # Stage 1: Vector Suitability Check
+    logger.info('Stage 1: Vector Suitability Check')
+    vector_suitability = check_vector_suitability(user_input)
+    if vector_suitability.get('not_suitable', False):
+        return jsonify({
+            'error': 'Not suitable for SVG',
+            'guidance': vector_suitability.get('guidance'),
+            'stage': 1
+        }), 400
+
+    # Stage 2: Design Planning
+    logger.info('Stage 2: Design Planning')
+    design_plan = plan_design(user_input)
+
+    # Stage 3: Design Knowledge Generation
+    logger.info('Stage 3: Design Knowledge Generation')
+    design_knowledge = generate_design_knowledge(design_plan, user_input)
+
+    # Prepare context for enhancements
+    design_context = f"""Design Plan:\n{design_plan}\n\nDesign Knowledge and Best Practices:\n{design_knowledge}\n\nOriginal Request:\n{user_input}"""
+
+    # Stage 4 & 5: Prompt Enhancements
+    if skip_enhancement:
+        enhanced_prompt = user_input
+    else:
+        logger.info('Stage 4: Pre-Enhancement')
+        pre = pre_enhance_prompt(design_context)
+        logger.info('Stage 5: Technical Enhancement')
+        enhanced_prompt = enhance_prompt_with_chat(pre)
+
+    # Stage 6: Image Generation via GPT-Image
+    logger.info('Stage 6: Image Generation via GPT-Image')
+    image_base64, image_filename = generate_image_with_gpt(enhanced_prompt)
+
+    # Stage 7: GPT-4.1-mini-based SVG generation
+    logger.info('Stage 7: GPT-4.1-mini-based SVG generation')
+    # Use image URL and original prompt to reduce payload size
+    image_url = request.host_url.rstrip('/') + f'/static/images/{image_filename}'
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {OPENAI_API_KEY_ENHANCER}'
+    }
+    system_prompt = (
+        'You are a vector graphics expert. '
+        'Given an image URL and the original design prompt, fetch the image and detect all visible text. '
+        "Generate an SVG containing only <text> elements that EXACTLY preserve each text element's content, font size (in px), fill color (HEX), x and y coordinates, and alignment. "
+        'Use SVG attributes: viewBox matching the image width and height; font-size in pixels; fill with HEX color; text-anchor set to left/center/right based on alignment; alignment-baseline="baseline"; and font-family="sans-serif" if unspecified. '
+        'Do not include any other elements or metadata. Return ONLY the complete <svg>...</svg> block.'
+    )
+    user_prompt = (
+        f'Image URL: {image_url}\n'
+        f'Original prompt: {user_input}'
+    )
+    payload = {
+        'model': SVG_GENERATOR_MODEL,
+        'messages': [
+            {'role': 'system', 'content': system_prompt},
+            {'role': 'user', 'content': user_prompt}
+        ],
+        'temperature': 0.0,
+        'max_tokens': 2000
+    }
+    response = requests.post(OPENAI_CHAT_ENDPOINT, headers=headers, json=payload)
+    response_data = response.json()
+    if response.status_code != 200:
+        logger.error(f'SVG generation via GPT error: {response_data}')
+        return jsonify({'error': 'SVG generation failed'}), 500
+    svg_content = response_data['choices'][0]['message']['content']
+    # Extract <svg> block if needed
+    match = re.search(r'<svg.*?</svg>', svg_content, re.DOTALL)
+    svg_code = match.group(0) if match else svg_content
+    # Save SVG
+    svg_filename = save_svg(svg_code, prefix='text_svg')
+
+    return jsonify({
+        'original_prompt': user_input,
+        'image_url': f'/static/images/{image_filename}',
+        'svg_code': svg_code,
+        'svg_path': svg_filename,
+        'stage': 7
+    })
+
+if __name__ == '__main__':
+    # Run standalone on port 5003
+    app.run(host='127.0.0.1', port=5003, debug=True) 

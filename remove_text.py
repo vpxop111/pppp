@@ -11,7 +11,7 @@ def create_mask_for_text_areas(image_path):
     """Automatically detect and mask text regions using OCR."""
     # Load image in RGB for OCR
     img = Image.open(image_path)
-    if img.mode != 'RGB':
+    if img.mode != 'RGB':  parallel_svg_pipeline.py
         img = img.convert('RGB')
     # Run OCR to get bounding boxes
     data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)

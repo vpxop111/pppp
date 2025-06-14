@@ -1,0 +1,29 @@
+<svg width="1080" height="1080" viewBox="0 0 1080 1080" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Text: Coming Soon Stay Tuned">
+  <style>
+    .big-text {
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-weight: 700;
+      font-size: 160px;
+      fill: white;
+      stroke: #222;
+      stroke-width: 1px;
+      paint-order: stroke fill;
+      text-anchor: middle;
+    }
+    .small-text {
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-weight: 700;
+      font-size: 48px;
+      fill: white;
+      stroke: #222;
+      stroke-width: 0.8px;
+      paint-order: stroke fill;
+      text-anchor: middle;
+      letter-spacing: 0.18em;
+    }
+  </style>
+  <path d="M0 0 C337.92 0 675.84 0 1024 0 C1024 337.92 1024 675.84 1024 1024 C686.08 1024 348.16 1024 0 1024 C0 686.08 0 348.16 0 0 Z " fill="#362F27" transform="translate(0,0)"/>
+  <text class="big-text" x="540" y="450">COMING</text>
+  <text class="big-text" x="540" y="630">SOON</text>
+  <text class="small-text" x="540" y="720">STAY TUNED</text>
+</svg>

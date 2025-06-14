@@ -1,0 +1,21 @@
+<svg width="1080" height="1080" viewBox="0 0 1080 1080" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+  <style>
+    .coming-soon {
+      font-family: 'Arial Black', Arial, sans-serif;
+      font-weight: 900;
+      font-size: 180px;
+      fill: #f36f09;
+      text-anchor: middle;
+    }
+    .date {
+      font-family: Arial, sans-serif;
+      font-weight: 500;
+      font-size: 48px;
+      fill: #ffffff;
+      text-anchor: middle;
+    }
+  </style>
+  <text x="540" y="460" class="coming-soon">COMING</text>
+  <text x="540" y="660" class="coming-soon">SOON</text>
+  <text x="540" y="760" class="date">JUNE 2024</text>
+</svg>

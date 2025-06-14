@@ -2,10 +2,11 @@ flask
 requests
 flask-cors
 cairosvg
-numpy
 pillow
-pytesseract
 openai
 python-dotenv
 gunicorn
-vtracer
+opencv-python-headless
+numpy
+pytesseract
+vtracer==0.6.11

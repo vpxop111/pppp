@@ -1,0 +1,31 @@
+<svg width="1080" height="1080" viewBox="0 0 1080 1080" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+  <style>
+    .largeText {
+      font-family: 'Arial Black', Arial, sans-serif;
+      font-weight: 900;
+      font-size: 180px;
+      fill: #f44343;
+      stroke: #881616;
+      stroke-width: 1;
+      filter: drop-shadow(0 0 10px #f44343);
+      text-anchor: middle;
+    }
+    .smallText {
+      font-family: 'Arial Black', Arial, sans-serif;
+      font-weight: 900;
+      font-size: 48px;
+      fill: #fafafa;
+      stroke: #666;
+      stroke-width: 0.5;
+      filter: drop-shadow(0 0 8px #fafafa);
+      text-anchor: middle;
+    }
+  </style>
+  <g transform="translate(540 480) rotate(-7)">
+    <text class="largeText" x="0" y="0">COMING</text>
+    <text class="largeText" x="0" y="180">SOON</text>
+  </g>
+  <g transform="translate(540 700) rotate(-10)">
+    <text class="smallText" x="0" y="0">STAY TUNED</text>
+  </g>
+</svg>

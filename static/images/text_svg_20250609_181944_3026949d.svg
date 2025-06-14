@@ -1,0 +1,25 @@
+<svg width="1080" height="1080" viewBox="0 0 1080 1080" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+  <style>
+    .text-large {
+      font-family: Arial, sans-serif;
+      font-weight: bold;
+      font-size: 220px;
+      fill: white;
+      stroke: #07193b;
+      stroke-width: 2;
+      paint-order: stroke;
+    }
+    .text-medium {
+      font-family: Arial, sans-serif;
+      font-weight: bold;
+      font-size: 90px;
+      fill: white;
+      stroke: #07193b;
+      stroke-width: 1.5;
+      paint-order: stroke;
+      letter-spacing: 10px;
+    }
+  </style>
+  <text class="text-medium" x="270" y="440" >COMING</text>
+  <text class="text-large" x="230" y="740" >SOON</text>
+</svg>

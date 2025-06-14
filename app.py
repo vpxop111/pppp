@@ -13,7 +13,7 @@ import openai
 import uuid
 from datetime import datetime
 from dotenv import load_dotenv
-import vtracer  # Add vtracer import
+# import vtracer  # Add vtracer import - temporarily disabled due to Render compilation issues
 
 # Load environment variables
 load_dotenv()
@@ -560,52 +560,12 @@ def generate_image_with_gpt(enhanced_prompt, design_context=None):
         raise
 
 def generate_svg_from_image(image_base64, enhanced_prompt):
-    """Generate SVG code using vtracer from image"""
-    logger.info("Starting SVG generation from image using vtracer")
+    """Generate SVG code from image - vtracer temporarily disabled for deployment"""
+    logger.info("SVG generation from image requested - vtracer temporarily disabled")
     
-    try:
-        # Decode base64 image
-        image_bytes = base64.b64decode(image_base64)
-        image = Image.open(BytesIO(image_bytes))
-        
-        # Save temporary PNG file for vtracer
-        temp_png = os.path.join(IMAGES_DIR, f"temp_{uuid.uuid4()}.png")
-        image.save(temp_png, format="PNG")
-        
-        # Generate output path for SVG
-        output_svg = os.path.join(IMAGES_DIR, f"output_{uuid.uuid4()}.svg")
-        
-        # Convert image to SVG using vtracer with optimized settings
-        vtracer.convert_image_to_svg_py(
-            temp_png,
-            output_svg,
-            colormode='color',        # Use color mode for richer output
-            hierarchical='stacked',   # Use stacked mode for better layering
-            mode='spline',           # Use spline mode for smoother curves
-            filter_speckle=4,        # Remove small artifacts
-            color_precision=6,       # Good balance of color accuracy
-            layer_difference=16,     # Reasonable layer separation
-            corner_threshold=60,     # Balanced corner detection
-            length_threshold=4.0,    # Good detail preservation
-            max_iterations=10,       # Sufficient optimization
-            splice_threshold=45,     # Good path connection
-            path_precision=3         # Compact but accurate paths
-        )
-        
-        # Read the generated SVG
-        with open(output_svg, 'r') as f:
-            svg_code = f.read()
-            
-        # Clean up temporary files
-        os.remove(temp_png)
-        os.remove(output_svg)
-        
-        logger.info("Successfully generated SVG using vtracer")
-        return svg_code
-        
-    except Exception as e:
-        logger.error(f"Error in SVG generation with vtracer: {str(e)}")
-        raise
+    # For now, return a message indicating vtracer is disabled
+    # In the future, you can implement an alternative approach or re-enable vtracer
+    raise NotImplementedError("Image-to-SVG conversion temporarily disabled due to deployment constraints. Please use text-based SVG generation instead.")
 
 def clean_svg_code_original(svg_code):
     """Original clean and validate SVG code function"""

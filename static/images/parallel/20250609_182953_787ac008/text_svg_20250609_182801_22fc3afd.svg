@@ -1,0 +1,9 @@
+<svg width="1080" height="1080" viewBox="0 0 1080 1080" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+  <style>
+    .big { font-family: "Arial Black", Arial, sans-serif; font-weight: 900; fill: #ffffff; font-size: 160px; }
+    .small { font-family: Arial, sans-serif; fill: #ffffff; font-size: 50px; }
+  </style>
+  <text x="50%" y="45%" text-anchor="middle" class="big" dominant-baseline="middle">COMING</text>
+  <text x="50%" y="65%" text-anchor="middle" class="big" dominant-baseline="middle">SOON</text>
+  <text x="50%" y="80%" text-anchor="middle" class="small" dominant-baseline="middle">Stay tuned</text>
+</svg>

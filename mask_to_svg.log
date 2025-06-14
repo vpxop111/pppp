@@ -1,0 +1,19 @@
+2025-06-08 04:52:20,519 - INFO - Processing mask image: mask_ChatGPT Image Jun 8, 2025, 04_35_06 AM.png
+2025-06-08 04:52:20,547 - INFO - Analyzing mask with GPT-4.1 mini...
+2025-06-08 04:52:30,040 - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-06-08 04:52:30,045 - INFO - Mask analysis complete
+2025-06-08 04:52:30,045 - INFO - Generating SVG from analysis...
+2025-06-08 04:52:38,088 - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-06-08 04:52:38,092 - INFO - ✓ SVG generated and saved as: mask_svg_20250608_045220_a5ed06cf.svg
+2025-06-08 04:56:13,259 - INFO - Processing mask image: mask_ChatGPT Image Jun 8, 2025, 04_35_06 AM.png
+2025-06-08 04:56:13,288 - INFO - Generating SVG with GPT-4.1 mini...
+2025-06-08 04:56:41,188 - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-06-08 04:56:41,200 - INFO - ✓ SVG generated and saved as: mask_svg_20250608_045613_22db48b1.svg
+2025-06-08 04:59:57,612 - INFO - Processing mask image: mask_ChatGPT Image Jun 8, 2025, 04_35_06 AM.png
+2025-06-08 04:59:57,641 - INFO - Generating SVG with GPT-4.1 mini...
+2025-06-08 05:00:33,607 - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-06-08 05:00:33,618 - INFO - ✓ SVG generated and saved as: mask_svg_20250608_045957_e9187a93.svg
+2025-06-08 05:02:25,103 - INFO - Processing mask image: mask_ChatGPT Image Jun 8, 2025, 04_35_06 AM.png
+2025-06-08 05:02:25,131 - INFO - Generating SVG with GPT-4.1 mini...
+2025-06-08 05:03:35,209 - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-06-08 05:03:35,223 - INFO - ✓ SVG generated and saved as: mask_svg_20250608_050225_c700ac1c.svg

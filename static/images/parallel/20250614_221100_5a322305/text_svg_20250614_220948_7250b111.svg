@@ -1,0 +1,31 @@
+<svg width="1080" height="1080" viewBox="0 0 1080 1080" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+  <defs>
+    <linearGradient id="grad1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f6a828"/>
+      <stop offset="100%" stop-color="#d98d1f"/>
+    </linearGradient>
+    <style>
+      .title {
+        font-family: Arial, sans-serif;
+        font-weight: bold;
+        font-size: 180px;
+        fill: url(#grad1);
+        text-anchor: middle;
+      }
+      .subtitle {
+        font-family: Arial, sans-serif;
+        font-style: italic;
+        font-size: 38px;
+        fill: #ffffff;
+        opacity: 0.85;
+        text-anchor: middle;
+        letter-spacing: 0.05em;
+      }
+    </style>
+  </defs>
+
+  <text x="540" y="460" class="title">COMING</text>
+  <text x="540" y="660" class="title">SOON</text>
+  <text x="540" y="760" class="subtitle">Stay tuned for something</text>
+  <text x="540" y="810" class="subtitle">L takeover</text>
+</svg>

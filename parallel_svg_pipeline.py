@@ -641,15 +641,8 @@ def health_check():
 if __name__ == '__main__':
     # Use PORT environment variable or default to 5004
     port = int(os.environ.get('PORT', 8000))
-    # Use 0.0.0.0 for deployment platforms (Render, Heroku, etc.) or 127.0.0.1 for local
-    host = os.environ.get('HOST', '0.0.0.0' if os.environ.get('PORT') else '127.0.0.1')
+    host = os.environ.get('HOST', '127.0.0.1')
     debug = os.environ.get('DEBUG', 'True').lower() == 'true'
     
     logger.info(f"Starting Flask app on {host}:{port} (debug={debug})")
-    logger.info("Available endpoints:")
-    logger.info("  GET  /           - API documentation")
-    logger.info("  GET  /health     - Health check")
-    logger.info("  POST /api/generate-svg - Generate SVG") 
-    logger.info("  POST /api/generate-parallel-svg - Parallel SVG generation")
-    
     app.run(host=host, port=port, debug=debug) 

@@ -1,0 +1,25 @@
+<svg width="1080" height="1080" viewBox="0 0 1080 1080" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+  <style>
+    .largeText {
+      font-family: 'Arial Black', Arial, sans-serif;
+      font-weight: 900;
+      font-size: 170px;
+      fill: #f0f7fc;
+      stroke: #0c1827;
+      stroke-width: 2;
+      letter-spacing: 5px;
+    }
+    .smallText {
+      font-family: 'Arial Black', Arial, sans-serif;
+      font-weight: 900;
+      font-size: 54px;
+      fill: #3499b9;
+      stroke: #0c1827;
+      stroke-width: 0.5;
+      letter-spacing: 5px;
+    }
+  </style>
+  <text class="largeText" x="540" y="600" text-anchor="middle" dominant-baseline="middle">COMING</text>
+  <text class="largeText" x="540" y="780" text-anchor="middle" dominant-baseline="middle">SOON</text>
+  <text class="smallText" x="540" y="890" text-anchor="middle" dominant-baseline="middle">STAY TUNED</text>
+</svg>

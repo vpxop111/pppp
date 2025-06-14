@@ -1,0 +1,26 @@
+<svg width="1080" height="1080" viewBox="0 0 1080 1080" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+  <style>
+    .main-text {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 900;
+      font-size: 150px;
+      fill: #d27477;
+      stroke: #a0494c;
+      stroke-width: 1;
+      filter: drop-shadow(0 0 10px #d27477);
+      text-anchor: middle;
+    }
+    .sub-text {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 40px;
+      fill: #bec9de;
+      text-anchor: middle;
+      letter-spacing: 0.07em;
+    }
+  </style>
+  <text class="main-text" x="540" y="480">COMING</text>
+  <text class="main-text" x="540" y="650">SOON</text>
+  <text class="sub-text" x="540" y="790">BIAY TLACS YOT</text>
+  <text class="sub-text" x="540" y="840">MATH LINLAING</text>
+</svg>
