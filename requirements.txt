@@ -2,6 +2,7 @@ flask
 requests
 flask-cors
 cairosvg
+numpy
 pillow
 pytesseract
 openai
