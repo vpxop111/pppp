@@ -13,7 +13,12 @@ import openai
 import uuid
 from datetime import datetime
 from dotenv import load_dotenv
-# import vtracer  # Add vtracer import - temporarily disabled due to Render compilation issues
+import vtracer
+from concurrent.futures import ThreadPoolExecutor
+import pytesseract
+import numpy as np
+import remove_text_simple
+import png_to_svg_converter
 
 # Load environment variables
 load_dotenv()
@@ -51,6 +56,10 @@ STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
 IMAGES_DIR = os.path.join(STATIC_DIR, 'images')
 os.makedirs(IMAGES_DIR, exist_ok=True)
 
+# Directory for parallel pipeline outputs
+PARALLEL_OUTPUTS_DIR = os.path.join(IMAGES_DIR, 'parallel')
+os.makedirs(PARALLEL_OUTPUTS_DIR, exist_ok=True)
+
 # API keys
 OPENAI_API_KEY_ENHANCER = os.getenv('OPENAI_API_KEY_ENHANCER')
 OPENAI_API_KEY_SVG = os.getenv('OPENAI_API_KEY_SVG')
@@ -58,8 +67,12 @@ OPENAI_API_KEY_SVG = os.getenv('OPENAI_API_KEY_SVG')
 if not OPENAI_API_KEY_ENHANCER or not OPENAI_API_KEY_SVG:
     raise ValueError("OpenAI API keys must be set in environment variables")
 
-# OpenAI client setupkk
+# OpenAI client setup
 openai.api_key = OPENAI_API_KEY_SVG
+
+# Instantiate a GPT client for chat completions (parallel pipeline)
+from openai import OpenAI
+chat_client = OpenAI()
 
 # OpenAI API Endpoints
 OPENAI_API_BASE = "https://api.openai.com/v1"
@@ -1203,6 +1216,218 @@ def chat_assistant():
         logger.error(error_msg)
         logger.exception("Full traceback:")
         return jsonify({"error": error_msg}), 500
+
+# Parallel SVG Pipeline Functions
+def process_image_parallel(image_base64, enhanced_prompt):
+    """Process image in parallel using multiple techniques"""
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        # Submit tasks
+        vtracer_future = executor.submit(process_vtracer, image_base64)
+        text_future = executor.submit(process_text_extraction, image_base64)
+        simple_future = executor.submit(process_simple_conversion, image_base64)
+        
+        # Gather results
+        results = {
+            'vtracer': vtracer_future.result(),
+            'text': text_future.result(),
+            'simple': simple_future.result()
+        }
+        
+        return results
+
+def process_vtracer(image_base64):
+    """Process image using vtracer"""
+    try:
+        # Decode base64 image
+        image_data = base64.b64decode(image_base64)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        input_filename = f"vtracer_input_{timestamp}_{uuid.uuid4().hex[:8]}.png"
+        input_filepath = os.path.join(PARALLEL_OUTPUTS_DIR, input_filename)
+        
+        # Save input image
+        with open(input_filepath, "wb") as f:
+            f.write(image_data)
+            
+        # Configure vtracer
+        config = vtracer.Configuration()
+        config.corner_threshold = 60
+        config.length_threshold = 4.0
+        config.splice_threshold = 45
+        config.filter_speckle = 4
+        config.color_mode = "color"
+        config.hierarchical = True
+        config.mode = "polygon"
+        config.path_precision = 8
+        
+        # Process with vtracer
+        svg_output = vtracer.convert_image_to_svg_path(input_filepath, config)
+        
+        # Save SVG output
+        output_filename = f"vtracer_output_{timestamp}.svg"
+        output_filepath = os.path.join(PARALLEL_OUTPUTS_DIR, output_filename)
+        with open(output_filepath, "w") as f:
+            f.write(svg_output)
+            
+        return {
+            'success': True,
+            'svg': svg_output,
+            'path': output_filename
+        }
+        
+    except Exception as e:
+        logger.error(f"Vtracer processing error: {str(e)}")
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+def process_text_extraction(image_base64):
+    """Extract text from image using OCR"""
+    try:
+        # Decode and open image
+        image_data = base64.b64decode(image_base64)
+        image = Image.open(BytesIO(image_data))
+        
+        # Extract text
+        text = pytesseract.image_to_string(image)
+        
+        # Get text boxes
+        boxes = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)
+        
+        # Create SVG with text elements
+        width, height = image.size
+        svg_elements = ['<?xml version="1.0" encoding="UTF-8"?>']
+        svg_elements.append(f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">')
+        
+        for i in range(len(boxes['text'])):
+            if boxes['text'][i].strip():
+                x = boxes['left'][i]
+                y = boxes['top'][i] + boxes['height'][i]  # Adjust y for text baseline
+                svg_elements.append(f'  <text x="{x}" y="{y}" font-family="Arial" font-size="{boxes["height"][i]}px">{boxes["text"][i]}</text>')
+        
+        svg_elements.append('</svg>')
+        svg_output = '\n'.join(svg_elements)
+        
+        # Save output
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_filename = f"text_output_{timestamp}.svg"
+        output_filepath = os.path.join(PARALLEL_OUTPUTS_DIR, output_filename)
+        with open(output_filepath, "w") as f:
+            f.write(svg_output)
+            
+        return {
+            'success': True,
+            'text': text,
+            'svg': svg_output,
+            'path': output_filename
+        }
+        
+    except Exception as e:
+        logger.error(f"Text extraction error: {str(e)}")
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+def process_simple_conversion(image_base64):
+    """Simple PNG to SVG conversion"""
+    try:
+        # Decode and save image
+        image_data = base64.b64decode(image_base64)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        input_filename = f"simple_input_{timestamp}_{uuid.uuid4().hex[:8]}.png"
+        input_filepath = os.path.join(PARALLEL_OUTPUTS_DIR, input_filename)
+        
+        with open(input_filepath, "wb") as f:
+            f.write(image_data)
+            
+        # Convert using simple converter
+        output_filename = f"simple_output_{timestamp}.svg"
+        output_filepath = os.path.join(PARALLEL_OUTPUTS_DIR, output_filename)
+        
+        png_to_svg_converter.convert_png_to_svg(input_filepath, output_filepath)
+        
+        with open(output_filepath, "r") as f:
+            svg_output = f.read()
+            
+        return {
+            'success': True,
+            'svg': svg_output,
+            'path': output_filename
+        }
+        
+    except Exception as e:
+        logger.error(f"Simple conversion error: {str(e)}")
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+@app.route('/api/parallel-svg', methods=['POST'])
+def generate_parallel_svg():
+    """Generate SVG using multiple parallel techniques"""
+    data = request.json or {}
+    user_input = data.get('prompt', '')
+    skip_enhancement = data.get('skip_enhancement', False)
+    
+    if not user_input:
+        return jsonify({'error': 'No prompt provided'}), 400
+        
+    logger.info('=== PARALLEL SVG PIPELINE START ===')
+    
+    # Stage 1: Vector Suitability Check
+    logger.info('\n[STAGE 1: Vector Suitability]')
+    logger.info('--------------------------------------------------')
+    vector_suitability = check_vector_suitability(user_input)
+    if vector_suitability.get('not_suitable', False):
+        return jsonify({
+            'error': 'Not suitable for SVG',
+            'guidance': vector_suitability.get('guidance'),
+            'stage': 1
+        }), 400
+        
+    # Stage 2: Design Planning
+    logger.info('\n[STAGE 2: Design Planning]')
+    logger.info('--------------------------------------------------')
+    design_plan = plan_design(user_input)
+    
+    # Stage 3: Design Knowledge
+    logger.info('\n[STAGE 3: Design Knowledge]')
+    logger.info('--------------------------------------------------')
+    design_knowledge = generate_design_knowledge(design_plan, user_input)
+    
+    # Prepare context for enhancements
+    design_context = f"""Design Plan:\n{design_plan}\n\nDesign Knowledge and Best Practices:\n{design_knowledge}\n\nOriginal Request:\n{user_input}"""
+    
+    # Stage 4 & 5: Prompt Enhancement
+    if skip_enhancement:
+        enhanced_prompt = user_input
+    else:
+        logger.info('\n[STAGE 4: Pre-Enhancement]')
+        logger.info('--------------------------------------------------')
+        pre = pre_enhance_prompt(design_context)
+        logger.info('\n[STAGE 5: Technical Enhancement]')
+        logger.info('--------------------------------------------------')
+        enhanced_prompt = enhance_prompt_with_chat(pre)
+        
+    # Stage 6: Image Generation
+    logger.info('\n[STAGE 6: Image Generation]')
+    logger.info('--------------------------------------------------')
+    image_base64, image_filename = generate_image_with_gpt(enhanced_prompt)
+    
+    # Stage 7: Parallel SVG Processing
+    logger.info('\n[STAGE 7: Parallel SVG Processing]')
+    logger.info('--------------------------------------------------')
+    results = process_image_parallel(image_base64, enhanced_prompt)
+    
+    return jsonify({
+        'original_prompt': user_input,
+        'image_url': f'/static/images/{image_filename}',
+        'vtracer_result': results['vtracer'],
+        'text_result': results['text'],
+        'simple_result': results['simple'],
+        'stage': 7
+    })
 
 if __name__ == '__main__':
     # Get port from environment variable (Render sets PORT=8000)
