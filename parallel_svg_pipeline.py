@@ -617,6 +617,39 @@ def generate_parallel_svg():
         'stage': 8
     })
 
+@app.route('/')
+def home():
+    """Home page with API documentation"""
+    return {
+        "message": "SVG Generation API Server",
+        "version": "1.0.0",
+        "endpoints": {
+            "/api/generate-svg": "POST - Generate SVG from text prompt",
+            "/api/generate-parallel-svg": "POST - Generate SVG using parallel pipeline", 
+            "/api/chat-assistant": "POST - Chat with AI assistant",
+            "/static/images/<filename>": "GET - Serve generated images",
+            "/health": "GET - Health check endpoint"
+        },
+        "status": "running"
+    }
+
+@app.route('/health')
+def health_check():
+    """Health check endpoint for deployment platforms"""
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
 if __name__ == '__main__':
-    # Run standalone on port 5004
-    app.run(host='127.0.0.1', port=5004, debug=True) 
+    # Use PORT environment variable or default to 5004
+    port = int(os.environ.get('PORT', 5004))
+    # Use 0.0.0.0 for deployment platforms (Render, Heroku, etc.) or 127.0.0.1 for local
+    host = os.environ.get('HOST', '0.0.0.0' if os.environ.get('PORT') else '127.0.0.1')
+    debug = os.environ.get('DEBUG', 'True').lower() == 'true'
+    
+    logger.info(f"Starting Flask app on {host}:{port} (debug={debug})")
+    logger.info("Available endpoints:")
+    logger.info("  GET  /           - API documentation")
+    logger.info("  GET  /health     - Health check")
+    logger.info("  POST /api/generate-svg - Generate SVG") 
+    logger.info("  POST /api/generate-parallel-svg - Parallel SVG generation")
+    
+    app.run(host=host, port=port, debug=debug) 
