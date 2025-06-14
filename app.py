@@ -543,8 +543,7 @@ def generate_image_with_gpt(enhanced_prompt, design_context=None):
             model=GPT_IMAGE_MODEL,
             prompt=optimized_prompt,
             size="1024x1024",
-            quality="standard",  # Changed from "low" to "standard" for better quality
-            style="natural"      # Added style parameter for more realistic results
+            quality="low"   # Changed from "low" to "standard" for better quality
         )
 
         # Get base64 image data from the response
