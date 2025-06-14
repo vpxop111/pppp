@@ -27,17 +27,19 @@ from openai import OpenAI
 import requests
 import re
 import logging
+from utils import (
+    PARALLEL_OUTPUTS_DIR,
+    save_image,
+    generate_image_with_gpt
+)
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
-def init_parallel_pipeline(images_dir):
-    """Initialize parallel pipeline with the given images directory"""
-    global IMAGES_DIR, PARALLEL_OUTPUTS_DIR
-    IMAGES_DIR = images_dir
-    PARALLEL_OUTPUTS_DIR = os.path.join(IMAGES_DIR, 'parallel')
-    os.makedirs(PARALLEL_OUTPUTS_DIR, exist_ok=True)
-    return PARALLEL_OUTPUTS_DIR
+def init_parallel_pipeline():
+    """Initialize the parallel SVG pipeline"""
+    logger.info("Initializing parallel SVG pipeline")
+    return True
 
 # Instantiate a GPT client for chat completions
 chat_client = OpenAI()
@@ -507,109 +509,67 @@ def simple_combine_svgs(text_svg_code, traced_svg_code):
     logger.info(f'Stage 8.13: Advanced combination completed - Final size: {len(combined_svg)} characters')
     return combined_svg
 
-def generate_parallel_svg_pipeline(user_input, skip_enhancement=False, images_dir=None):
-    """Pipeline: Stages 1-6 image gen, then parallel Stage 7: OCR+SVG and Clean SVG generation"""
-    if images_dir:
-        init_parallel_pipeline(images_dir)
+def generate_parallel_svg_pipeline(data):
+    """Generate SVG using parallel pipeline with vtracer"""
+    try:
+        user_input = data.get('prompt', '')
+        skip_enhancement = data.get('skip_enhancement', False)
 
-    if not user_input:
-        raise ValueError('No prompt provided')
+        if not user_input:
+            return jsonify({'error': 'No prompt provided'}), 400
 
-    logger.info('=== PARALLEL SVG PIPELINE START ===')
+        logger.info('=== PARALLEL SVG PIPELINE START ===')
 
-    # Build an advanced image prompt optimized for parallel SVG processing
-    image_prompt = build_advanced_image_prompt(user_input, None)
+        # Generate image using GPT
+        image_base64, image_filename = generate_image_with_gpt(user_input)
 
-    # Stage 6: Image Generation via GPT-Image using enhanced prompt
-    logger.info('Stage 6: Image Generation via GPT-Image with enhanced prompt')
-    logger.debug(f'Image prompt: {image_prompt[:200]}...')
-    image_base64, image_filename = generate_image_with_gpt(image_prompt)
-    image_data = base64.b64decode(image_base64)
-
-    # Stage 7: Parallel Processing
-    logger.info('Stage 7: Parallel Processing - OCR+SVG and Clean SVG')
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        # Submit both tasks
-        ocr_future = executor.submit(process_ocr_svg, image_data)
-        clean_future = executor.submit(process_clean_svg, image_data)
+        # Save the image for vtracer processing
+        image_data = base64.b64decode(image_base64)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        input_filename = f"parallel_input_{timestamp}_{uuid.uuid4().hex[:8]}.png"
+        input_filepath = os.path.join(PARALLEL_OUTPUTS_DIR, input_filename)
         
-        # Get results
-        text_svg_code, text_svg_path = ocr_future.result()
-        clean_svg_code, clean_svg_path, edited_png_path = clean_future.result()
+        with open(input_filepath, "wb") as f:
+            f.write(image_data)
 
-    # Stage 8: Combine SVGs
-    logger.info('Stage 8: Combining SVGs using HTTP API')
-    combined_svg_code = combine_svgs(text_svg_code, clean_svg_code)
-    combined_svg_filename = f"combined_svg_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}.svg"
-    combined_svg_path = os.path.join(IMAGES_DIR, combined_svg_filename)
-    with open(combined_svg_path, 'w') as f:
-        f.write(combined_svg_code)
+        # Process with vtracer
+        output_svg = f"parallel_output_{timestamp}_{uuid.uuid4().hex[:8]}.svg"
+        output_filepath = os.path.join(PARALLEL_OUTPUTS_DIR, output_svg)
 
-    # Create a session subfolder and move outputs there
-    session_folder = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
-    output_folder = os.path.join(PARALLEL_OUTPUTS_DIR, session_folder)
-    os.makedirs(output_folder, exist_ok=True)
+        config = vtracer.Config(
+            color_mode="color",
+            hierarchical=False,
+            filter_speckle=4,
+            corner_threshold=60,
+            length_threshold=4.0,
+            splice_threshold=45,
+            path_precision=8,
+        )
+        
+        vtracer.convert_image_to_svg_path(
+            input_filepath,
+            output_filepath,
+            config
+        )
 
-    # Base URL for parallel outputs
-    base_url = '/static/images/parallel'
+        # Read the generated SVG
+        with open(output_filepath, 'r') as f:
+            svg_code = f.read()
 
-    # Move generated image into session folder
-    src_image = os.path.join(IMAGES_DIR, image_filename)
-    dst_image = os.path.join(output_folder, image_filename)
-    os.rename(src_image, dst_image)
+        # Save final SVG and return
+        svg_filename = save_svg(svg_code, prefix='parallel_svg')
+        
+        return {
+            'original_prompt': user_input,
+            'image_url': f'/static/images/{image_filename}',
+            'svg_code': svg_code,
+            'svg_path': svg_filename,
+            'stage': 'complete'
+        }
 
-    # Move text SVG into session folder
-    src_text_svg = os.path.join(IMAGES_DIR, text_svg_path)
-    dst_text_svg = os.path.join(output_folder, text_svg_path)
-    os.rename(src_text_svg, dst_text_svg)
-
-    # Move cleaned SVG into session folder
-    if not os.path.isabs(clean_svg_path):
-        src_clean_svg = os.path.join(os.getcwd(), clean_svg_path)
-    else:
-        src_clean_svg = clean_svg_path
-    dst_clean_svg = os.path.join(output_folder, os.path.basename(clean_svg_path))
-    os.rename(src_clean_svg, dst_clean_svg)
-
-    # Move combined SVG into session folder
-    src_combined_svg = combined_svg_path
-    dst_combined_svg = os.path.join(output_folder, combined_svg_filename)
-    os.rename(src_combined_svg, dst_combined_svg)
-
-    # Move cleaned PNG (converter input) into session folder
-    src_edited_png = edited_png_path if os.path.isabs(edited_png_path) else edited_png_path
-    dst_edited_png = os.path.join(output_folder, os.path.basename(edited_png_path))
-    os.rename(src_edited_png, dst_edited_png)
-    edited_png_url = f"{base_url}/{session_folder}/{os.path.basename(edited_png_path)}"
-
-    # Construct URLs for client access
-    image_url = f"{base_url}/{session_folder}/{image_filename}"
-    text_svg_url = f"{base_url}/{session_folder}/{text_svg_path}"
-    clean_svg_url = f"{base_url}/{session_folder}/{os.path.basename(clean_svg_path)}"
-    combined_svg_url = f"{base_url}/{session_folder}/{combined_svg_filename}"
-
-    return {
-        'original_prompt': user_input,
-        'image_url': image_url,
-        'edited_png': {
-            'path': f"parallel/{session_folder}/{os.path.basename(edited_png_path)}",
-            'url': edited_png_url
-        },
-        'text_svg': {
-            'code': text_svg_code,
-            'path': f"parallel/{session_folder}/{text_svg_path}"
-        },
-        'clean_svg': {
-            'code': clean_svg_code,
-            'path': f"parallel/{session_folder}/{os.path.basename(clean_svg_path)}"
-        },
-        'combined_svg': {
-            'code': combined_svg_code,
-            'path': f"parallel/{session_folder}/{combined_svg_filename}",
-            'url': combined_svg_url
-        },
-        'stage': 8
-    }
+    except Exception as e:
+        logger.error(f"Error in parallel SVG pipeline: {str(e)}")
+        return {'error': str(e), 'stage': 'failed'}, 500
 
 @app.route('/')
 def home():

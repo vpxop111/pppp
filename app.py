@@ -19,7 +19,16 @@ import pytesseract
 import numpy as np
 import remove_text_simple
 import png_to_svg_converter
+from utils import (
+    logger,
+    STATIC_DIR,
+    IMAGES_DIR,
+    save_image,
+    save_svg,
+    generate_image_with_gpt
+)
 from parallel_svg_pipeline import generate_parallel_svg_pipeline, init_parallel_pipeline
+from image_to_text_svg_pipeline import generate_image_text_svg
 
 # Load environment variables
 load_dotenv()
@@ -660,45 +669,6 @@ def clean_svg_code_original(svg_code):
     except Exception as error:
         logger.error(f"Error cleaning SVG: {str(error)}")
         return svg_code
-
-def save_image(image_data, prefix="img", format="PNG"):
-    """Save image data to file and return the filename"""
-    try:
-        # Generate unique filename
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        unique_id = str(uuid.uuid4())[:8]
-        filename = f"{prefix}_{timestamp}_{unique_id}.{format.lower()}"
-        filepath = os.path.join(IMAGES_DIR, filename)
-
-        # Convert base64 to image and save
-        image_bytes = base64.b64decode(image_data)
-        image = Image.open(BytesIO(image_bytes))
-        image.save(filepath, format=format)
-        
-        logger.info(f"Image saved successfully: {filename}")
-        return filename
-    except Exception as e:
-        logger.error(f"Error saving image: {str(e)}")
-        raise
-
-def save_svg(svg_code, prefix="svg"):
-    """Save SVG code to file and return the filename"""
-    try:
-        # Generate unique filename
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        unique_id = str(uuid.uuid4())[:8]
-        filename = f"{prefix}_{timestamp}_{unique_id}.svg"
-        filepath = os.path.join(IMAGES_DIR, filename)
-
-        # Save SVG code to file
-        with open(filepath, 'w', encoding='utf-8') as f:
-            f.write(svg_code)
-        
-        logger.info(f"SVG saved successfully: {filename}")
-        return filename
-    except Exception as e:
-        logger.error(f"Error saving SVG: {str(e)}")
-        raise
 
 def convert_svg_to_png(svg_code):
     """Convert SVG code to PNG and save both files"""
@@ -1368,33 +1338,18 @@ def process_simple_conversion(image_base64):
         }
 
 @app.route('/api/generate-parallel-svg', methods=['POST'])
-def generate_parallel_svg():
-    """Generate SVG using parallel pipeline"""
+def handle_parallel_svg():
+    """Handle parallel SVG generation request"""
     try:
-        data = request.json or {}
-        user_input = data.get('prompt', '')
-        skip_enhancement = data.get('skip_enhancement', False)
-
-        if not user_input:
-            return jsonify({'error': 'No prompt provided'}), 400
-
-        # Call the parallel SVG pipeline
-        result = generate_parallel_svg_pipeline(user_input, skip_enhancement, IMAGES_DIR)
+        result = generate_parallel_svg_pipeline(request.json)
         return jsonify(result)
-
     except Exception as e:
-        logger.error(f"Error in parallel SVG generation: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Error in parallel SVG handler: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    # Get port from environment variable (Render sets PORT=8000)
-    port = int(os.getenv('PORT', 5001))
-    
-    # Use 0.0.0.0 for production (Render) and 127.0.0.1 for local development
-    host = '0.0.0.0' if os.getenv('PORT') else '127.0.0.1'
-    
-    # Disable debug mode in production
-    debug = not bool(os.getenv('PORT'))
-    
-    logger.info(f"Starting Flask application on {host}:{port} (debug={debug})")
-    app.run(host=host, port=port, debug=debug)
+    # Get port from environment variable for deployment
+    port = int(os.environ.get('PORT', 5000))
+    # Use 0.0.0.0 when PORT env var is set (deployment)
+    host = '0.0.0.0' if 'PORT' in os.environ else '127.0.0.1'
+    app.run(host=host, port=port, debug=True)
