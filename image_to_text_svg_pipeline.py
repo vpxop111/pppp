@@ -8,7 +8,8 @@ from app import (
     enhance_prompt_with_chat,
     generate_image_with_gpt,
     save_svg,
-    logger
+    logger,
+    IMAGES_DIR
 )
 import base64
 from io import BytesIO
