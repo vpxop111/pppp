@@ -1,0 +1,39 @@
+<svg width="1080" height="1080" viewBox="0 0 1080 1080" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+  <style>
+    .coming {
+      font-family: 'Arial Black', sans-serif;
+      font-weight: 900;
+      font-size: 175px;
+      fill: #ffffff;
+      filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.15));
+      text-anchor: middle;
+    }
+    .soon {
+      font-family: 'Arial Black', sans-serif;
+      font-weight: 900;
+      font-size: 240px;
+      fill: #fdb913;
+      filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.3));
+      text-anchor: middle;
+    }
+    .stay-tuned {
+      font-family: 'Arial Black', sans-serif;
+      font-weight: 900;
+      font-size: 90px;
+      fill: #fdb913;
+      text-anchor: middle;
+    }
+    .small-text {
+      font-family: 'Arial', sans-serif;
+      font-size: 30px;
+      fill: #ffffff;
+      letter-spacing: 0.05em;
+      text-anchor: middle;
+      opacity: 0.7;
+    }
+  </style>
+  <text class="coming" x="540" y="300">COMING</text>
+  <text class="soon" x="540" y="540">SOON</text>
+  <text class="stay-tuned" x="540" y="830">STAY TUNED</text>
+  <text class="small-text" x="540" y="960">erecipes are a g sicssacns ienne celnimte ninerta an eirfsorraser.</text>
+</svg>

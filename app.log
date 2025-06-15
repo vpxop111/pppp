@@ -9914,3 +9914,391 @@ Certainly! Here's a detailed structured plan to create an eye-catching "Coming S
 2025-06-15 00:26:08,633 - INFO - Starting Flask app on 127.0.0.1:8000 (debug=True)
 2025-06-15 00:26:08,649 - WARNING -  * Debugger is active!
 2025-06-15 00:26:08,656 - INFO -  * Debugger PIN: 785-225-615
+2025-06-15 23:41:44,188 - INFO - Starting Flask application on 127.0.0.1:5001 (debug=True)
+2025-06-15 23:41:44,253 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5001
+2025-06-15 23:41:44,253 - INFO - [33mPress CTRL+C to quit[0m
+2025-06-15 23:41:44,254 - INFO -  * Restarting with stat
+2025-06-15 23:41:44,659 - INFO - Starting Flask application on 127.0.0.1:5001 (debug=True)
+2025-06-15 23:41:44,671 - WARNING -  * Debugger is active!
+2025-06-15 23:41:44,677 - INFO -  * Debugger PIN: 989-968-462
+2025-06-15 23:42:32,345 - INFO - 127.0.0.1 - - [15/Jun/2025 23:42:32] "OPTIONS /api/chat-assistant HTTP/1.1" 200 -
+2025-06-15 23:42:32,351 - INFO - ================================================================================
+2025-06-15 23:42:32,351 - INFO - CHAT ASSISTANT REQUEST
+2025-06-15 23:42:32,351 - INFO - ================================================================================
+2025-06-15 23:42:32,351 - INFO - Chat history length: 1
+2025-06-15 23:42:32,351 - INFO - Last message: {'role': 'user', 'content': 'Create a coming soon poster'}
+2025-06-15 23:42:32,352 - INFO - 
+[Request Analysis]
+2025-06-15 23:42:32,352 - INFO - --------------------------------------------------
+2025-06-15 23:42:32,352 - INFO - Request type: Creation
+2025-06-15 23:42:32,352 - INFO - User message: create a coming soon poster
+2025-06-15 23:42:32,352 - INFO - 
+[Starting New Design Creation]
+2025-06-15 23:42:32,352 - INFO - --------------------------------------------------
+2025-06-15 23:42:32,352 - INFO - 
+[STAGE 1: Planning Phase]
+2025-06-15 23:42:32,353 - INFO - --------------------------------------------------
+2025-06-15 23:42:32,353 - INFO - Creating structured design plan...
+2025-06-15 23:42:32,353 - INFO - Using model: gpt-4.1-nano
+2025-06-15 23:42:32,353 - INFO - Planning design for: create a coming soon poster...
+2025-06-15 23:42:32,932 - ERROR - Design planning error: {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************5TIA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+2025-06-15 23:42:32,932 - INFO - 
+Design Plan Generated:
+2025-06-15 23:42:32,932 - INFO -   Error in design planning
+2025-06-15 23:42:32,933 - INFO -   ...
+2025-06-15 23:42:32,933 - INFO - 
+[STAGE 2: Design Knowledge Generation]
+2025-06-15 23:42:32,933 - INFO - --------------------------------------------------
+2025-06-15 23:42:32,933 - INFO - Gathering design knowledge and best practices...
+2025-06-15 23:42:32,933 - INFO - Using model: gpt-4.1-nano
+2025-06-15 23:42:32,933 - INFO - Generating design knowledge...
+2025-06-15 23:42:33,363 - ERROR - Design knowledge generation error: {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************5TIA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+2025-06-15 23:42:33,364 - INFO - 
+Design Knowledge Generated:
+2025-06-15 23:42:33,364 - INFO -   Error in generating design knowledge
+2025-06-15 23:42:33,364 - INFO -   ...
+2025-06-15 23:42:33,364 - INFO - 
+[STAGE 3: Pre-enhancement Phase]
+2025-06-15 23:42:33,364 - INFO - --------------------------------------------------
+2025-06-15 23:42:33,364 - INFO - Pre-enhancing prompt with design context...
+2025-06-15 23:42:33,364 - INFO - Using model: gpt-4.1-nano
+2025-06-15 23:42:33,364 - INFO - Pre-enhancing prompt: Design Plan:
+Error in design planning
+
+Design Knowledge:
+Error in generating design knowledge
+
+Origi...
+2025-06-15 23:42:33,364 - INFO - Calling OpenAI Chat API for initial prompt enhancement with model: gpt-4.1-nano
+2025-06-15 23:42:33,694 - ERROR - OpenAI API error: {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************5TIA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+2025-06-15 23:42:33,694 - ERROR - Response status code: 401
+2025-06-15 23:42:33,694 - ERROR - Response headers: {'Date': 'Sun, 15 Jun 2025 18:12:33 GMT', 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': '414', 'Connection': 'keep-alive', 'vary': 'Origin', 'x-request-id': 'req_b53f58b187c3127cd51590859459cc8f', 'strict-transport-security': 'max-age=31536000; includeSubDomains; preload', 'cf-cache-status': 'DYNAMIC', 'Set-Cookie': '__cf_bm=Ywy2Vmlep4NPnRuIiJ719gdxW5yp4H8.QodPOm89kI8-1750011153-1.0.1.1-gWEPf_ApmInEynFcxsKObC7yKnMJjV4QWg9AjTOiRJwBZsoChmMZRRnKcKrgcMvXJP2jUDzVlGiilWP9_iUWsfXqgqjNfbv03UJlD.JkJvA; path=/; expires=Sun, 15-Jun-25 18:42:33 GMT; domain=.api.openai.com; HttpOnly; Secure; SameSite=None, _cfuvid=5I286FB1Ei3hwZjcY7ez4neXhfzdsQ3D1wHtetDkD4w-1750011153675-0.0.1.1-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None', 'X-Content-Type-Options': 'nosniff', 'Server': 'cloudflare', 'CF-RAY': '9504094cb8473a4b-BOM', 'alt-svc': 'h3=":443"; ma=86400'}
+2025-06-15 23:42:33,694 - ERROR - Error in design creation: OpenAI API error: Incorrect API key provided: sk-proj-********************************************************************************************************************************************************5TIA. You can find your API key at https://platform.openai.com/account/api-keys.
+2025-06-15 23:42:33,694 - INFO - 127.0.0.1 - - [15/Jun/2025 23:42:33] "POST /api/chat-assistant HTTP/1.1" 200 -
+2025-06-15 23:43:42,291 - INFO - Starting Flask application on 127.0.0.1:5001 (debug=True)
+2025-06-15 23:43:42,312 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5001
+2025-06-15 23:43:42,312 - INFO - [33mPress CTRL+C to quit[0m
+2025-06-15 23:43:42,313 - INFO -  * Restarting with stat
+2025-06-15 23:43:42,655 - INFO - Starting Flask application on 127.0.0.1:5001 (debug=True)
+2025-06-15 23:43:42,666 - WARNING -  * Debugger is active!
+2025-06-15 23:43:42,674 - INFO -  * Debugger PIN: 989-968-462
+2025-06-15 23:44:05,714 - INFO - Starting Flask application on 127.0.0.1:5004 (debug=True)
+2025-06-15 23:44:05,730 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5004
+2025-06-15 23:44:05,730 - INFO - [33mPress CTRL+C to quit[0m
+2025-06-15 23:44:05,731 - INFO -  * Restarting with stat
+2025-06-15 23:44:06,111 - INFO - Starting Flask application on 127.0.0.1:5004 (debug=True)
+2025-06-15 23:44:06,122 - WARNING -  * Debugger is active!
+2025-06-15 23:44:06,129 - INFO -  * Debugger PIN: 989-968-462
+2025-06-15 23:44:17,211 - INFO - 127.0.0.1 - - [15/Jun/2025 23:44:17] "[33mOPTIONS /api/generate-parallel-svg HTTP/1.1[0m" 404 -
+2025-06-15 23:47:06,281 - INFO -  * Detected change in '/Users/varunisrani/infoui/server/app.py', reloading
+2025-06-15 23:47:06,357 - INFO -  * Restarting with stat
+2025-06-15 23:47:07,189 - INFO - Starting Flask application on 127.0.0.1:5004 (debug=True)
+2025-06-15 23:47:07,203 - WARNING -  * Debugger is active!
+2025-06-15 23:47:07,214 - INFO -  * Debugger PIN: 989-968-462
+2025-06-15 23:47:15,338 - INFO -  * Detected change in '/Users/varunisrani/infoui/server/app.py', reloading
+2025-06-15 23:47:15,419 - INFO -  * Restarting with stat
+2025-06-15 23:47:15,996 - INFO - Starting Flask application on 127.0.0.1:5004 (debug=True)
+2025-06-15 23:47:16,009 - WARNING -  * Debugger is active!
+2025-06-15 23:47:16,015 - INFO -  * Debugger PIN: 989-968-462
+2025-06-15 23:47:18,044 - INFO -  * Detected change in '/Users/varunisrani/infoui/server/app.py', reloading
+2025-06-15 23:47:18,111 - INFO -  * Restarting with stat
+2025-06-15 23:47:18,514 - INFO - Starting Flask application on 127.0.0.1:5004 (debug=True)
+2025-06-15 23:47:18,524 - WARNING -  * Debugger is active!
+2025-06-15 23:47:18,529 - INFO -  * Debugger PIN: 989-968-462
+2025-06-15 23:47:41,741 - INFO - 127.0.0.1 - - [15/Jun/2025 23:47:41] "OPTIONS /api/generate-parallel-svg HTTP/1.1" 200 -
+2025-06-15 23:47:41,746 - INFO - === PARALLEL SVG PIPELINE START ===
+2025-06-15 23:47:41,746 - INFO - Stage 2: Design Planning
+2025-06-15 23:47:41,746 - INFO - Planning design for: Create a coming soon poster...
+2025-06-15 23:47:42,222 - ERROR - Design planning error: {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************5TIA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+2025-06-15 23:47:42,222 - INFO - Stage 3: Design Knowledge Generation
+2025-06-15 23:47:42,222 - INFO - Generating design knowledge...
+2025-06-15 23:47:42,592 - ERROR - Design knowledge generation error: {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************5TIA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+2025-06-15 23:47:42,593 - INFO - Stage 6: Image Generation via GPT-Image with enhanced prompt
+2025-06-15 23:47:42,593 - INFO - Generating image with GPT Image-1
+2025-06-15 23:47:42,593 - INFO - Optimized prompt: Create: Create a professional poster design: Create a coming soon poster || Design requirements: Bold typography, clear hierarchy, eye-catching visuals, structured layout || Visual style: High-impact ...
+2025-06-15 23:47:43,513 - INFO - HTTP Request: POST https://api.openai.com/v1/images/generations "HTTP/1.1 401 Unauthorized"
+2025-06-15 23:47:43,516 - ERROR - Error generating image with GPT Image-1: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************5TIA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+2025-06-15 23:47:43,516 - ERROR - Error in generate_parallel_svg: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************5TIA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+2025-06-15 23:47:43,518 - INFO - 127.0.0.1 - - [15/Jun/2025 23:47:43] "[35m[1mPOST /api/generate-parallel-svg HTTP/1.1[0m" 500 -
+2025-06-15 23:48:42,516 - INFO - Starting Flask application on 127.0.0.1:5001 (debug=True)
+2025-06-15 23:48:42,541 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5001
+2025-06-15 23:48:42,541 - INFO - [33mPress CTRL+C to quit[0m
+2025-06-15 23:48:42,542 - INFO -  * Restarting with stat
+2025-06-15 23:48:42,932 - INFO - Starting Flask application on 127.0.0.1:5001 (debug=True)
+2025-06-15 23:48:42,943 - WARNING -  * Debugger is active!
+2025-06-15 23:48:42,952 - INFO -  * Debugger PIN: 989-968-462
+2025-06-15 23:48:54,218 - INFO - 127.0.0.1 - - [15/Jun/2025 23:48:54] "OPTIONS /api/chat-assistant HTTP/1.1" 200 -
+2025-06-15 23:48:54,222 - INFO - ================================================================================
+2025-06-15 23:48:54,222 - INFO - CHAT ASSISTANT REQUEST
+2025-06-15 23:48:54,222 - INFO - ================================================================================
+2025-06-15 23:48:54,223 - INFO - Chat history length: 1
+2025-06-15 23:48:54,223 - INFO - Last message: {'role': 'user', 'content': 'Create a coming soon poster'}
+2025-06-15 23:48:54,223 - INFO - 
+[Request Analysis]
+2025-06-15 23:48:54,223 - INFO - --------------------------------------------------
+2025-06-15 23:48:54,223 - INFO - Request type: Creation
+2025-06-15 23:48:54,223 - INFO - User message: create a coming soon poster
+2025-06-15 23:48:54,223 - INFO - 
+[Starting New Design Creation]
+2025-06-15 23:48:54,223 - INFO - --------------------------------------------------
+2025-06-15 23:48:54,223 - INFO - 
+[STAGE 1: Planning Phase]
+2025-06-15 23:48:54,223 - INFO - --------------------------------------------------
+2025-06-15 23:48:54,223 - INFO - Creating structured design plan...
+2025-06-15 23:48:54,223 - INFO - Using model: gpt-4.1-nano
+2025-06-15 23:48:54,223 - INFO - Planning design for: create a coming soon poster...
+2025-06-15 23:49:03,139 - INFO - 
+Design Plan Generated:
+2025-06-15 23:49:03,139 - INFO -   Certainly! Here's a detailed, structured plan to design a compelling "Coming Soon" poster that captures attention and builds anticipation:
+2025-06-15 23:49:03,139 - INFO -   
+2025-06-15 23:49:03,139 - INFO -   ---
+2025-06-15 23:49:03,139 - INFO -   
+2025-06-15 23:49:03,139 - INFO -   ### 1. Design Goals
+2025-06-15 23:49:03,139 - INFO -   - **Main Purpose:** Announce an upcoming event, product, or opening with a visually striking poster.
+2025-06-15 23:49:03,139 - INFO -   - **Intended Use:** Digital and print display (social media, storefronts, banners).
+2025-06-15 23:49:03,139 - INFO -   - **Target Audience:** Broad demographic, potentially young adults, professionals, or community members depending on the context.
+2025-06-15 23:49:03,139 - INFO -   - **Mood:** Excitement, anticipation, modern professionalism.
+2025-06-15 23:49:03,139 - INFO -   - **Key Message:** "Coming Soon" with additional details if necessary (e.g., date, location, contact info).
+2025-06-15 23:49:03,139 - INFO -   ...
+2025-06-15 23:49:03,139 - INFO - 
+[STAGE 2: Design Knowledge Generation]
+2025-06-15 23:49:03,139 - INFO - --------------------------------------------------
+2025-06-15 23:49:03,139 - INFO - Gathering design knowledge and best practices...
+2025-06-15 23:49:03,139 - INFO - Using model: gpt-4.1-nano
+2025-06-15 23:49:03,139 - INFO - Generating design knowledge...
+2025-06-15 23:49:13,753 - INFO - 
+Design Knowledge Generated:
+2025-06-15 23:49:13,755 - INFO -   Certainly! Here's a comprehensive set of actionable recommendations to elevate your "Coming Soon" poster design, ensuring it is visually striking, professional, and aligned with your overall goals:
+2025-06-15 23:49:13,755 - INFO -   
+2025-06-15 23:49:13,755 - INFO -   ---
+2025-06-15 23:49:13,755 - INFO -   
+2025-06-15 23:49:13,755 - INFO -   ### 1. Typography and Branding
+2025-06-15 23:49:13,755 - INFO -   
+2025-06-15 23:49:13,755 - INFO -   **Font Recommendations & Pairings:**
+2025-06-15 23:49:13,755 - INFO -   - **Primary Headline ("Coming Soon")**: Use a bold, modern sans-serif font like **Montserrat Bold** or **Futura Bold**. These fonts are clean, highly legible, and contemporary.
+2025-06-15 23:49:13,755 - INFO -   - **Supporting Text (Details, Date, Location)**: Use a lighter weight of the same font family (e.g., Montserrat Regular) or pair with a complementary serif font like **Merriweather** for contrast if desired.
+2025-06-15 23:49:13,755 - INFO -   
+2025-06-15 23:49:13,755 - INFO -   ...
+2025-06-15 23:49:13,756 - INFO - 
+[STAGE 3: Pre-enhancement Phase]
+2025-06-15 23:49:13,756 - INFO - --------------------------------------------------
+2025-06-15 23:49:13,756 - INFO - Pre-enhancing prompt with design context...
+2025-06-15 23:49:13,756 - INFO - Using model: gpt-4.1-nano
+2025-06-15 23:49:13,756 - INFO - Pre-enhancing prompt: Design Plan:
+Certainly! Here's a detailed, structured plan to design a compelling "Coming Soon" post...
+2025-06-15 23:49:13,756 - INFO - Calling OpenAI Chat API for initial prompt enhancement with model: gpt-4.1-nano
+2025-06-15 23:49:29,587 - INFO - Successfully enhanced prompt. Result: Certainly! Based on your "Coming Soon" poster concept, here's a comprehensive, highly detailed desig...
+2025-06-15 23:49:29,588 - INFO - 
+Pre-enhanced Prompt:
+2025-06-15 23:49:29,588 - INFO -   Certainly! Based on your "Coming Soon" poster concept, here's a comprehensive, highly detailed design prompt optimized for creating a visually compelling, professional SVG poster. This prompt incorporates precise layout, typography, color schemes, visual elements, and technical specifications to ensure a high-quality, scalable, and impactful design:
+2025-06-15 23:49:29,588 - INFO -   
+2025-06-15 23:49:29,588 - INFO -   ---
+2025-06-15 23:49:29,588 - INFO -   
+2025-06-15 23:49:29,588 - INFO -   **Design Objective:**  
+2025-06-15 23:49:29,588 - INFO -   Create a modern, vibrant "Coming Soon" poster in SVG format that captures attention, builds anticipation, and aligns with a sleek, professional aesthetic suitable for digital and print media.
+2025-06-15 23:49:29,588 - INFO -   
+2025-06-15 23:49:29,588 - INFO -   ---
+2025-06-15 23:49:29,588 - INFO -   
+2025-06-15 23:49:29,589 - INFO -   ### 1. Layout & Composition  
+2025-06-15 23:49:29,589 - INFO -   ...
+2025-06-15 23:49:29,589 - INFO - 
+[STAGE 4: Final Enhancement Phase]
+2025-06-15 23:49:29,589 - INFO - --------------------------------------------------
+2025-06-15 23:49:29,589 - INFO - Enhancing prompt with technical specifications...
+2025-06-15 23:49:29,589 - INFO - Using model: gpt-4.1-nano
+2025-06-15 23:49:29,589 - INFO - Calling OpenAI Chat API for prompt enhancement with model: gpt-4.1-nano
+2025-06-15 23:49:37,264 - INFO - 
+Enhanced Prompt Generated:
+2025-06-15 23:49:37,264 - INFO -   Certainly! Here's an optimized, comprehensive SVG design prompt for your "Coming Soon" poster that emphasizes visual impact, technical precision, and flexibility:
+2025-06-15 23:49:37,264 - INFO -   
+2025-06-15 23:49:37,264 - INFO -   ---
+2025-06-15 23:49:37,264 - INFO -   
+2025-06-15 23:49:37,265 - INFO -   **Create a high-resolution, vector-optimized "Coming Soon" poster in SVG format with the following specifications:**
+2025-06-15 23:49:37,265 - INFO -   
+2025-06-15 23:49:37,265 - INFO -   **Layout & Composition:**  
+2025-06-15 23:49:37,265 - INFO -   - Center a bold headline "Coming Soon" using a geometric sans-serif font (e.g., Montserrat Bold) at approximately 80px (scalable units).  
+2025-06-15 23:49:37,265 - INFO -   - Position supportive details (event date, location, contact) below or around the headline, in a lighter weight (Montserrat Regular) at ~30px, all center-aligned with ample padding.  
+2025-06-15 23:49:37,265 - INFO -   - Incorporate subtle, abstract geometric shapes (circles, triangles, lines) in semi-transparent fills for depth and dynamism, layered behind or around text.  
+2025-06-15 23:49:37,265 - INFO -   ...
+2025-06-15 23:49:37,265 - INFO - 
+[STAGE 5: Image Generation]
+2025-06-15 23:49:37,265 - INFO - --------------------------------------------------
+2025-06-15 23:49:37,265 - INFO - Generating initial design image...
+2025-06-15 23:49:37,265 - INFO - Using model: gpt-image-1
+2025-06-15 23:49:37,265 - INFO - Generating image with GPT Image-1
+2025-06-15 23:49:37,265 - INFO - Optimized prompt: Create: Certainly! Here's an optimized, comprehensive SVG design prompt for your "Coming Soon" poster that emphasizes visual impact, technical precision, and flexibility:
+
+---
+
+**Create a high-resolut...
+2025-06-15 23:49:50,964 - INFO - HTTP Request: POST https://api.openai.com/v1/images/generations "HTTP/1.1 200 OK"
+2025-06-15 23:49:53,472 - INFO - Image saved successfully: gpt_image_20250615_234952_b5a45bdd.png
+2025-06-15 23:49:53,473 - INFO - Image generated and saved successfully with GPT Image-1
+2025-06-15 23:49:53,473 - INFO - Image generated and saved as: gpt_image_20250615_234952_b5a45bdd.png
+2025-06-15 23:49:53,473 - INFO - 
+[STAGE 6: SVG Generation]
+2025-06-15 23:49:53,473 - INFO - --------------------------------------------------
+2025-06-15 23:49:53,473 - INFO - Converting design to SVG format...
+2025-06-15 23:49:53,473 - INFO - Using model: gpt-4.1-nano
+2025-06-15 23:49:53,473 - INFO - SVG generation from image requested - vtracer temporarily disabled
+2025-06-15 23:49:53,473 - ERROR - Error in design creation: Image-to-SVG conversion temporarily disabled due to deployment constraints. Please use text-based SVG generation instead.
+2025-06-15 23:49:53,475 - INFO - 127.0.0.1 - - [15/Jun/2025 23:49:53] "POST /api/chat-assistant HTTP/1.1" 200 -
+2025-06-15 23:50:29,059 - INFO -  * Detected change in '/Users/varunisrani/infoui/server/app.py', reloading
+2025-06-15 23:50:29,192 - INFO -  * Restarting with stat
+2025-06-15 23:50:29,875 - INFO - Starting Flask application on 127.0.0.1:5001 (debug=True)
+2025-06-15 23:50:29,896 - WARNING -  * Debugger is active!
+2025-06-15 23:50:29,903 - INFO -  * Debugger PIN: 989-968-462
+2025-06-15 23:50:31,943 - INFO -  * Detected change in '/Users/varunisrani/infoui/server/app.py', reloading
+2025-06-15 23:50:32,011 - INFO -  * Restarting with stat
+2025-06-15 23:50:32,410 - INFO - Starting Flask application on 127.0.0.1:5001 (debug=True)
+2025-06-15 23:50:32,421 - WARNING -  * Debugger is active!
+2025-06-15 23:50:32,425 - INFO -  * Debugger PIN: 989-968-462
+2025-06-15 23:50:42,002 - INFO - 127.0.0.1 - - [15/Jun/2025 23:50:42] "GET /api/projects/templates?page=1&limit=4 HTTP/1.1" 200 -
+2025-06-15 23:51:00,464 - INFO - 127.0.0.1 - - [15/Jun/2025 23:51:00] "OPTIONS /api/generate-parallel-svg HTTP/1.1" 200 -
+2025-06-15 23:51:00,467 - INFO - === PARALLEL SVG PIPELINE START ===
+2025-06-15 23:51:00,467 - INFO - Stage 2: Design Planning
+2025-06-15 23:51:00,468 - INFO - Planning design for: Create a coming soon poster...
+2025-06-15 23:51:10,991 - INFO - Stage 3: Design Knowledge Generation
+2025-06-15 23:51:10,992 - INFO - Generating design knowledge...
+2025-06-15 23:51:22,654 - INFO - Stage 6: Image Generation via GPT-Image with enhanced prompt
+2025-06-15 23:51:22,655 - INFO - Generating image with GPT Image-1
+2025-06-15 23:51:22,655 - INFO - Optimized prompt: Create: Create a professional poster design: Create a coming soon poster || Design requirements: Bold typography, clear hierarchy, eye-catching visuals, structured layout || Visual style: High-impact ...
+2025-06-15 23:51:34,634 - INFO - HTTP Request: POST https://api.openai.com/v1/images/generations "HTTP/1.1 200 OK"
+2025-06-15 23:51:36,531 - INFO - Image saved successfully: gpt_image_20250615_235136_481c3aa2.png
+2025-06-15 23:51:36,532 - INFO - Image generated and saved successfully with GPT Image-1
+2025-06-15 23:51:36,535 - INFO - Stage 7: Parallel Processing - OCR+SVG and Clean SVG
+2025-06-15 23:51:44,572 - INFO - SVG saved successfully: text_svg_20250615_235144_9d9f7a4a.svg
+2025-06-15 23:51:51,631 - INFO - HTTP Request: POST https://api.openai.com/v1/images/edits "HTTP/1.1 200 OK"
+2025-06-15 23:51:53,252 - INFO - Stage 8: Combining SVGs
+2025-06-15 23:51:53,254 - INFO - 127.0.0.1 - - [15/Jun/2025 23:51:53] "POST /api/generate-parallel-svg HTTP/1.1" 200 -
+2025-06-15 23:54:42,534 - INFO -  * Detected change in '/Users/varunisrani/infoui/server/app.py', reloading
+2025-06-15 23:54:42,682 - INFO -  * Restarting with stat
+2025-06-15 23:54:43,356 - INFO - Starting Flask application on 127.0.0.1:5001 (debug=True)
+2025-06-15 23:54:43,375 - WARNING -  * Debugger is active!
+2025-06-15 23:54:43,381 - INFO -  * Debugger PIN: 989-968-462
+2025-06-15 23:54:51,524 - INFO -  * Detected change in '/Users/varunisrani/infoui/server/app.py', reloading
+2025-06-15 23:54:51,588 - INFO -  * Restarting with stat
+2025-06-15 23:54:52,148 - INFO - Starting Flask application on 127.0.0.1:5001 (debug=True)
+2025-06-15 23:54:52,160 - WARNING -  * Debugger is active!
+2025-06-15 23:54:52,165 - INFO -  * Debugger PIN: 989-968-462
+2025-06-15 23:55:30,940 - INFO -  * Detected change in '/Users/varunisrani/infoui/server/app.py', reloading
+2025-06-15 23:55:31,049 - INFO -  * Restarting with stat
+2025-06-15 23:55:31,765 - INFO - Starting Flask application on 127.0.0.1:5001 (debug=True)
+2025-06-15 23:55:31,781 - WARNING -  * Debugger is active!
+2025-06-15 23:55:31,787 - INFO -  * Debugger PIN: 989-968-462
+2025-06-15 23:55:36,456 - INFO - 127.0.0.1 - - [15/Jun/2025 23:55:36] "OPTIONS /api/generate-parallel-svg HTTP/1.1" 200 -
+2025-06-15 23:55:36,460 - INFO - === PARALLEL SVG PIPELINE START ===
+2025-06-15 23:55:36,460 - INFO - Stage 2: Design Planning
+2025-06-15 23:55:36,460 - INFO - Planning design for: Create a coming soon poster...
+2025-06-15 23:55:45,283 - INFO - Stage 3: Design Knowledge Generation
+2025-06-15 23:55:45,284 - INFO - Generating design knowledge...
+2025-06-15 23:55:56,433 - INFO - Stage 6: Image Generation via GPT-Image with enhanced prompt
+2025-06-15 23:55:56,433 - INFO - Generating image with GPT Image-1
+2025-06-15 23:55:56,433 - INFO - Optimized prompt: Create: Create a professional poster design: Create a coming soon poster || Design requirements: Bold typography, clear hierarchy, eye-catching visuals, structured layout || Visual style: High-impact ...
+2025-06-15 23:56:09,294 - INFO - HTTP Request: POST https://api.openai.com/v1/images/generations "HTTP/1.1 200 OK"
+2025-06-15 23:56:11,127 - INFO - Image saved successfully: gpt_image_20250615_235610_9e04a44b.png
+2025-06-15 23:56:11,127 - INFO - Image generated and saved successfully with GPT Image-1
+2025-06-15 23:56:11,130 - INFO - Stage 7: Parallel Processing - OCR+SVG and Clean SVG
+2025-06-15 23:56:25,620 - INFO - SVG saved successfully: text_svg_20250615_235625_e6ecf9a6.svg
+2025-06-15 23:56:32,487 - INFO - HTTP Request: POST https://api.openai.com/v1/images/edits "HTTP/1.1 200 OK"
+2025-06-15 23:56:34,311 - INFO - Stage 8: AI-Powered SVG Combination using GPT-4.1-nano
+2025-06-15 23:56:34,311 - INFO - Using AI to intelligently combine SVGs...
+2025-06-15 23:56:34,311 - INFO - Calling OpenAI for intelligent SVG combination...
+2025-06-15 23:57:07,439 - WARNING - Could not extract SVG from AI response, using fallback
+2025-06-15 23:57:07,450 - INFO - 127.0.0.1 - - [15/Jun/2025 23:57:07] "POST /api/generate-parallel-svg HTTP/1.1" 200 -
+2025-06-15 23:58:49,913 - INFO -  * Detected change in '/Users/varunisrani/infoui/server/app.py', reloading
+2025-06-15 23:58:50,031 - INFO -  * Restarting with stat
+2025-06-15 23:58:50,626 - INFO - Starting Flask application on 127.0.0.1:5001 (debug=True)
+2025-06-15 23:58:50,641 - WARNING -  * Debugger is active!
+2025-06-15 23:58:50,646 - INFO -  * Debugger PIN: 989-968-462
+2025-06-15 23:59:06,943 - INFO -  * Detected change in '/Users/varunisrani/infoui/server/app.py', reloading
+2025-06-15 23:59:07,033 - INFO -  * Restarting with stat
+2025-06-15 23:59:07,613 - INFO - Starting Flask application on 127.0.0.1:5001 (debug=True)
+2025-06-15 23:59:07,631 - WARNING -  * Debugger is active!
+2025-06-15 23:59:07,638 - INFO -  * Debugger PIN: 989-968-462
+2025-06-15 23:59:14,066 - INFO - 127.0.0.1 - - [15/Jun/2025 23:59:14] "OPTIONS /api/generate-parallel-svg HTTP/1.1" 200 -
+2025-06-15 23:59:14,070 - INFO - === PARALLEL SVG PIPELINE START ===
+2025-06-15 23:59:14,070 - INFO - Stage 2: Design Planning
+2025-06-15 23:59:14,070 - INFO - Planning design for: Create a coming soon poster...
+2025-06-15 23:59:21,480 - INFO - Stage 3: Design Knowledge Generation
+2025-06-15 23:59:21,481 - INFO - Generating design knowledge...
+2025-06-15 23:59:32,849 - INFO - Stage 4: Pre-Enhancement Phase
+2025-06-15 23:59:32,850 - INFO - Pre-enhancing prompt with design context...
+2025-06-15 23:59:32,850 - INFO - Using model: gpt-4.1-nano
+2025-06-15 23:59:32,850 - INFO - Pre-enhancing prompt: Design Plan:
+Certainly! Here's a detailed, structured plan for designing an eye-catching "Coming Soo...
+2025-06-15 23:59:32,850 - INFO - Calling OpenAI Chat API for initial prompt enhancement with model: gpt-4.1-nano
+2025-06-15 23:59:41,391 - INFO - Successfully enhanced prompt. Result: Certainly! Here's an enhanced, comprehensive design prompt tailored for creating a highly profession...
+2025-06-15 23:59:41,392 - INFO - Pre-enhanced prompt generated
+2025-06-15 23:59:41,392 - INFO - Stage 5: Final Enhancement Phase
+2025-06-15 23:59:41,392 - INFO - Enhancing prompt with technical specifications...
+2025-06-15 23:59:41,392 - INFO - Using model: gpt-4.1-nano
+2025-06-15 23:59:41,392 - INFO - Calling OpenAI Chat API for prompt enhancement with model: gpt-4.1-nano
+2025-06-15 23:59:55,069 - INFO - Enhanced prompt generated
+2025-06-15 23:59:55,070 - INFO - Stage 6: Image Generation via GPT-Image with enhanced prompt
+2025-06-15 23:59:55,071 - INFO - Generating image with GPT Image-1
+2025-06-15 23:59:55,071 - INFO - Optimized prompt: Create: Create a professional poster design: Certainly! Here's an optimized, detailed prompt to guide the SVG generator in creating a stunning "Coming Soon" poster with precise technical, aesthetic, a...
+2025-06-16 00:00:09,611 - INFO - HTTP Request: POST https://api.openai.com/v1/images/generations "HTTP/1.1 200 OK"
+2025-06-16 00:00:12,837 - INFO - Image saved successfully: gpt_image_20250616_000012_7c40a2b5.png
+2025-06-16 00:00:12,837 - INFO - Image generated and saved successfully with GPT Image-1
+2025-06-16 00:00:12,840 - INFO - Stage 7: Parallel Processing - OCR+SVG and Clean SVG
+2025-06-16 00:00:25,897 - INFO - SVG saved successfully: text_svg_20250616_000025_71fe09b5.svg
+2025-06-16 00:00:29,372 - INFO - HTTP Request: POST https://api.openai.com/v1/images/edits "HTTP/1.1 200 OK"
+2025-06-16 00:00:31,174 - INFO - Stage 8: AI-Powered SVG Combination using GPT-4.1-nano
+2025-06-16 00:00:31,174 - INFO - Using AI to intelligently combine SVGs...
+2025-06-16 00:00:31,174 - INFO - Calling OpenAI for intelligent SVG combination...
+2025-06-16 00:01:04,018 - WARNING - Could not extract SVG from AI response, using fallback
+2025-06-16 00:01:04,025 - INFO - 127.0.0.1 - - [16/Jun/2025 00:01:04] "POST /api/generate-parallel-svg HTTP/1.1" 200 -
+2025-06-16 00:02:16,828 - INFO -  * Detected change in '/Users/varunisrani/infoui/server/app.py', reloading
+2025-06-16 00:02:16,989 - INFO -  * Restarting with stat
+2025-06-16 00:02:17,716 - INFO - Starting Flask application on 127.0.0.1:5001 (debug=True)
+2025-06-16 00:02:17,733 - WARNING -  * Debugger is active!
+2025-06-16 00:02:17,739 - INFO -  * Debugger PIN: 989-968-462
+2025-06-16 00:02:26,928 - INFO -  * Detected change in '/Users/varunisrani/infoui/server/app.py', reloading
+2025-06-16 00:02:27,003 - INFO -  * Restarting with stat
+2025-06-16 00:02:27,633 - INFO - Starting Flask application on 127.0.0.1:5000 (debug=True)
+2025-06-16 00:02:27,646 - WARNING -  * Debugger is active!
+2025-06-16 00:02:27,651 - INFO -  * Debugger PIN: 989-968-462
+2025-06-16 00:13:33,372 - INFO - 127.0.0.1 - - [16/Jun/2025 00:13:33] "OPTIONS /api/chat-assistant HTTP/1.1" 200 -
+2025-06-16 00:13:33,380 - INFO - ================================================================================
+2025-06-16 00:13:33,380 - INFO - CHAT ASSISTANT REQUEST
+2025-06-16 00:13:33,380 - INFO - ================================================================================
+2025-06-16 00:13:33,380 - INFO - Chat history length: 1
+2025-06-16 00:13:33,380 - INFO - Last message: {'role': 'user', 'content': 'Create a coming soon poster'}
+2025-06-16 00:13:33,380 - INFO - 
+[Request Analysis]
+2025-06-16 00:13:33,380 - INFO - --------------------------------------------------
+2025-06-16 00:13:33,380 - INFO - Request type: Creation
+2025-06-16 00:13:33,380 - INFO - User message: create a coming soon poster
+2025-06-16 00:13:33,380 - INFO - 
+[Starting New Design Creation]
+2025-06-16 00:13:33,380 - INFO - --------------------------------------------------
+2025-06-16 00:13:33,380 - INFO - 
+[STAGE 1: Planning Phase]
+2025-06-16 00:13:33,381 - INFO - --------------------------------------------------
+2025-06-16 00:13:33,381 - INFO - Creating structured design plan...
+2025-06-16 00:13:33,381 - INFO - Using model: gpt-4.1-nano
+2025-06-16 00:13:33,381 - INFO - Planning design for: create a coming soon poster...
+2025-06-16 00:13:39,873 - INFO - 
+Design Plan Generated:
+2025-06-16 00:13:39,873 - INFO -   Certainly! Here's a structured plan to create a compelling "Coming Soon" poster that effectively captures attention and builds anticipation:
+2025-06-16 00:13:39,874 - INFO -   
+2025-06-16 00:13:39,874 - INFO -   ---
+2025-06-16 00:13:39,874 - INFO -   
+2025-06-16 00:13:39,874 - INFO -   ### 1. Design Goals
+2025-06-16 00:13:39,874 - INFO -   - **Main Purpose:** Announce an upcoming event, product, or launch with intrigue.
+2025-06-16 00:13:39,874 - INFO -   - **Intended Use:** High-quality poster for digital and print display.
+2025-06-16 00:13:39,874 - INFO -   - **Target Audience:** General public, potential customers, or followers.
+2025-06-16 00:13:39,874 - INFO -   - **Mood:** Exciting, mysterious, modern.
+2025-06-16 00:13:39,874 - INFO -   - **Key Message:** "Coming Soon" with a hint of curiosity about what's next.
+2025-06-16 00:13:39,874 - INFO -   ...
+2025-06-16 00:13:39,874 - INFO - 
+[STAGE 2: Design Knowledge Generation]
+2025-06-16 00:13:39,874 - INFO - --------------------------------------------------
+2025-06-16 00:13:39,874 - INFO - Gathering design knowledge and best practices...
+2025-06-16 00:13:39,874 - INFO - Using model: gpt-4.1-nano
+2025-06-16 00:13:39,874 - INFO - Generating design knowledge...

@@ -579,37 +579,12 @@ def generate_image_with_gpt(enhanced_prompt, design_context=None):
         raise
 
 def generate_svg_from_image(image_base64, enhanced_prompt):
-    """Generate SVG code from image using VTracer Python library"""
-    logger.info("SVG generation from image requested - using VTracer Python library")
+    """Generate SVG code from image - vtracer temporarily disabled for deployment"""
+    logger.info("SVG generation from image requested - vtracer temporarily disabled")
     
-    try:
-        # Decode base64 image
-        image_bytes = base64.b64decode(image_base64)
-        
-        # Convert image to SVG using VTracer Python library
-        svg_str = vtracer.convert_raw_image_to_svg(
-            image_bytes, 
-            img_format='png',
-            colormode='color',        # Use color mode for better results
-            hierarchical='stacked',   # Stacked hierarchical clustering
-            mode='spline',           # Use spline curves for smooth paths
-            filter_speckle=4,        # Remove small artifacts
-            color_precision=6,       # Good color precision
-            layer_difference=16,     # Layer separation
-            corner_threshold=60,     # Corner detection sensitivity
-            length_threshold=4.0,    # Curve length threshold
-            max_iterations=10,       # Optimization iterations
-            splice_threshold=45,     # Curve splicing threshold
-            path_precision=3         # Path coordinate precision
-        )
-        
-        logger.info("Successfully converted image to SVG using VTracer")
-        return svg_str
-        
-    except Exception as e:
-        logger.error(f"Error converting image to SVG with VTracer: {str(e)}")
-        # Fallback to text-based SVG generation
-        raise NotImplementedError(f"VTracer conversion failed: {str(e)}. Please use text-based SVG generation instead.")
+    # For now, return a message indicating vtracer is disabled
+    # In the future, you can implement an alternative approach or re-enable vtracer
+    raise NotImplementedError("Image-to-SVG conversion temporarily disabled due to deployment constraints. Please use text-based SVG generation instead.")
 
 def clean_svg_code_original(svg_code):
     """Original clean and validate SVG code function"""
