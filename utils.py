@@ -123,11 +123,27 @@ def generate_image_with_gpt(enhanced_prompt, design_context=None):
             model=GPT_IMAGE_MODEL,
             prompt=optimized_prompt,
             size="1024x1024",
-            quality="standard"
+            quality="standard",
+            response_format="b64_json"  # Explicitly request base64 format
         )
 
         # Get base64 image data from the response
-        image_base64 = response.data[0].b64_json if hasattr(response.data[0], 'b64_json') else response.data[0].url
+        if response.data and len(response.data) > 0:
+            image_data = response.data[0]
+            if hasattr(image_data, 'b64_json') and image_data.b64_json:
+                image_base64 = image_data.b64_json
+            elif hasattr(image_data, 'url') and image_data.url:
+                # If we got a URL instead, download the image and convert to base64
+                import requests
+                img_response = requests.get(image_data.url)
+                if img_response.status_code == 200:
+                    image_base64 = base64.b64encode(img_response.content).decode('utf-8')
+                else:
+                    raise Exception(f"Failed to download image from URL: {image_data.url}")
+            else:
+                raise Exception("No valid image data found in response")
+        else:
+            raise Exception("Empty response data from OpenAI API")
 
         # Save the generated image
         filename = save_image(image_base64, prefix="gpt_image")
