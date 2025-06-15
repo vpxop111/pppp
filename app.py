@@ -55,12 +55,12 @@ OPENAI_API_KEY_SVG = os.getenv('OPENAI_API_KEY_SVG')
 OPENAI_API_BASE = "https://api.openai.com/v1"
 OPENAI_CHAT_ENDPOINT = f"{OPENAI_API_BASE}/chat/completions"
 
-# Model names (using standard OpenAI models that are widely available)
+# Model names (using low OpenAI models that are widely available)
 PLANNER_MODEL = "gpt-4o-mini"
 DESIGN_KNOWLEDGE_MODEL = "gpt-4o-mini"
 PRE_ENHANCER_MODEL = "gpt-4o-mini"
 PROMPT_ENHANCER_MODEL = "gpt-4o-mini"
-GPT_IMAGE_MODEL = "dall-e-3"
+GPT_IMAGE_MODEL = "gpt-image-1"
 SVG_GENERATOR_MODEL = "gpt-4o-mini"
 CHAT_ASSISTANT_MODEL = "gpt-4o-mini"
 
@@ -276,7 +276,7 @@ def generate_image_with_gpt(enhanced_prompt, design_context=None):
             model=GPT_IMAGE_MODEL,
             prompt=optimized_prompt,
             size="1024x1024",
-            quality="standard",   # Using standard quality as supported by OpenAI API
+            quality="low",   # Using low quality as supported by OpenAI API
             response_format="b64_json"  # Explicitly request base64 format
         )
 
