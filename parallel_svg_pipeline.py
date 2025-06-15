@@ -1,3 +1,4 @@
+from flask import request, jsonify
 from concurrent.futures import ThreadPoolExecutor
 import base64
 from io import BytesIO
@@ -7,14 +8,13 @@ import os
 import uuid
 from datetime import datetime
 import vtracer
-from shared_functions import (
+from app import (
+    app,
     check_vector_suitability,
     plan_design,
     generate_design_knowledge,
     pre_enhance_prompt,
-    enhance_prompt_with_chat
-)
-from utils import (
+    enhance_prompt_with_chat,
     generate_image_with_gpt,
     save_svg,
     logger,
@@ -26,52 +26,10 @@ import png_to_svg_converter
 from openai import OpenAI
 import requests
 import re
-import logging
-from utils import (
-    PARALLEL_OUTPUTS_DIR,
-    save_image,
-    generate_image_with_gpt
-)
-import sys
-import traceback
 
-# Configure logging
-logger = logging.getLogger(__name__)
-
-def init_parallel_pipeline():
-    """Initialize the parallel SVG pipeline"""
-    try:
-        logger.info("Initializing parallel SVG pipeline")
-        
-        # Try to verify vtracer is available, but don't fail if it's not
-        vtracer_available = False
-        try:
-            import vtracer
-            if hasattr(vtracer, 'convert_image_to_svg_path') or hasattr(vtracer, 'convert_image_to_svg_py'):
-                vtracer_available = True
-                logger.info("vtracer module found and verified")
-            else:
-                logger.warning("vtracer module found but missing expected functions")
-        except ImportError:
-            logger.warning("vtracer module not available - parallel SVG features will be limited")
-        
-        # Verify directories exist
-        if not os.path.exists(PARALLEL_OUTPUTS_DIR):
-            os.makedirs(PARALLEL_OUTPUTS_DIR, exist_ok=True)
-            logger.info(f"Created PARALLEL_OUTPUTS_DIR: {PARALLEL_OUTPUTS_DIR}")
-        
-        if vtracer_available:
-            logger.info("Parallel SVG pipeline initialized successfully with vtracer support")
-        else:
-            logger.info("Parallel SVG pipeline initialized with limited functionality (no vtracer)")
-        
-        return vtracer_available
-    except Exception as e:
-        logger.error(f"Failed to initialize parallel SVG pipeline: {str(e)}")
-        logger.error(traceback.format_exc())
-        # Don't raise the exception - allow the app to continue without parallel pipeline
-        logger.warning("Continuing without parallel SVG pipeline support")
-        return False
+# Directory for parallel pipeline outputs
+PARALLEL_OUTPUTS_DIR = os.path.join(IMAGES_DIR, 'parallel')
+os.makedirs(PARALLEL_OUTPUTS_DIR, exist_ok=True)
 
 # Instantiate a GPT client for chat completions
 chat_client = OpenAI()
@@ -541,159 +499,150 @@ def simple_combine_svgs(text_svg_code, traced_svg_code):
     logger.info(f'Stage 8.13: Advanced combination completed - Final size: {len(combined_svg)} characters')
     return combined_svg
 
-def generate_parallel_svg_pipeline(data):
-    """Generate SVG using parallel pipeline with vtracer"""
-    try:
-        user_input = data.get('prompt', '')
-        skip_enhancement = data.get('skip_enhancement', False)
+@app.route('/api/generate-parallel-svg', methods=['POST'])
+def generate_parallel_svg():
+    """Pipeline: Stages 1-6 image gen, then parallel Stage 7: OCR+SVG and Clean SVG generation"""
+    data = request.json or {}
+    user_input = data.get('prompt', '')
+    skip_enhancement = data.get('skip_enhancement', False)
 
-        if not user_input:
-            return {'error': 'No prompt provided'}
+    if not user_input:
+        return jsonify({'error': 'No prompt provided'}), 400
 
-        logger.info('=== PARALLEL SVG PIPELINE START ===')
-        logger.info(f'Processing prompt: {user_input[:100]}...')
+    logger.info('=== PARALLEL SVG PIPELINE START ===')
 
-        # Check if vtracer is available
-        vtracer_available = False
-        try:
-            import vtracer
-            if hasattr(vtracer, 'convert_image_to_svg_path') or hasattr(vtracer, 'Config'):
-                vtracer_available = True
-        except ImportError:
-            pass
+    # Stage 2: Design Planning
+    logger.info('Stage 2: Design Planning')
+    design_plan = plan_design(user_input)
+
+    # Stage 3: Design Knowledge Generation
+    logger.info('Stage 3: Design Knowledge Generation')
+    design_knowledge = generate_design_knowledge(design_plan, user_input)
+
+    # Prepare context for enhancements
+    design_context = f"""Design Plan:\n{design_plan}\n\nDesign Knowledge and Best Practices:\n{design_knowledge}\n\nOriginal Request:\n{user_input}"""
+
+    # Stages 4 & 5 skipped: Prompt Enhancements removed
+    # Build an advanced image prompt optimized for parallel SVG processing
+    image_prompt = build_advanced_image_prompt(user_input, design_context)
+
+    # Stage 6: Image Generation via GPT-Image using enhanced prompt
+    logger.info('Stage 6: Image Generation via GPT-Image with enhanced prompt')
+    logger.debug(f'Image prompt: {image_prompt[:200]}...')
+    image_base64, image_filename = generate_image_with_gpt(image_prompt, design_context)
+    image_data = base64.b64decode(image_base64)
+
+    # Stage 7: Parallel Processing
+    logger.info('Stage 7: Parallel Processing - OCR+SVG and Clean SVG')
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        # Submit both tasks
+        ocr_future = executor.submit(process_ocr_svg, image_data)
+        clean_future = executor.submit(process_clean_svg, image_data)
         
-        if not vtracer_available:
-            logger.warning('vtracer not available - falling back to standard SVG generation')
-            # Fallback to the standard generation method from shared_functions
-            from shared_functions import (
-                check_vector_suitability,
-                plan_design,
-                generate_design_knowledge,
-                pre_enhance_prompt,
-                enhance_prompt_with_chat
-            )
-            
-            # Stage 1: Vector Suitability Check
-            vector_suitability = check_vector_suitability(user_input)
-            if vector_suitability.get('not_suitable', False):
-                return {
-                    'error': 'Not suitable for SVG',
-                    'guidance': vector_suitability.get('guidance'),
-                    'stage': 'vector_check'
-                }
-            
-            # Stages 2-5: Design planning and enhancement
-            design_plan = plan_design(user_input)
-            design_knowledge = generate_design_knowledge(design_plan, user_input)
-            design_context = f"""Design Plan:\n{design_plan}\n\nDesign Knowledge:\n{design_knowledge}\n\nOriginal Request:\n{user_input}"""
-            
-            if not skip_enhancement:
-                pre_enhanced = pre_enhance_prompt(design_context)
-                enhanced_prompt = enhance_prompt_with_chat(pre_enhanced)
-            else:
-                enhanced_prompt = user_input
-            
-            # Stage 6: Generate image using GPT
-            image_base64, image_filename = generate_image_with_gpt(enhanced_prompt)
-            
-            # Stage 7: Use a simple PNG to SVG converter as fallback
-            try:
-                import png_to_svg_converter
-                image_data = base64.b64decode(image_base64)
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                input_filename = f"fallback_input_{timestamp}_{uuid.uuid4().hex[:8]}.png"
-                input_filepath = os.path.join(PARALLEL_OUTPUTS_DIR, input_filename)
-                
-                with open(input_filepath, "wb") as f:
-                    f.write(image_data)
-                
-                output_filepath = os.path.join(PARALLEL_OUTPUTS_DIR, f"fallback_output_{timestamp}.svg")
-                png_to_svg_converter.convert_png_to_svg(input_filepath, output_filepath)
-                
-                with open(output_filepath, 'r') as f:
-                    svg_code = f.read()
-                
-                svg_filename = save_svg(svg_code, prefix='fallback_svg')
-                
-                return {
-                    'original_prompt': user_input,
-                    'image_url': f'/static/images/{image_filename}',
-                    'svg_code': svg_code,
-                    'svg_path': svg_filename,
-                    'stage': 'fallback_complete',
-                    'note': 'Generated using fallback method (vtracer not available)'
-                }
-                
-            except Exception as fallback_error:
-                logger.error(f"Fallback SVG generation failed: {str(fallback_error)}")
-                # Return just the image if SVG conversion fails
-                return {
-                    'original_prompt': user_input,
-                    'image_url': f'/static/images/{image_filename}',
-                    'svg_code': None,
-                    'svg_path': None,
-                    'stage': 'image_only',
-                    'note': 'SVG conversion unavailable - image generated successfully'
-                }
+        # Get results
+        text_svg_code, text_svg_path = ocr_future.result()
+        clean_svg_code, clean_svg_path, edited_png_path = clean_future.result()
 
-        # Original vtracer-based processing
-        logger.info('Using vtracer for SVG conversion')
-        
-        # Generate image using GPT
-        image_base64, image_filename = generate_image_with_gpt(user_input)
-        logger.info(f'Image generated: {image_filename}')
+    # Stage 8: Combine SVGs
+    logger.info('Stage 8: Combining SVGs using HTTP API')
+    combined_svg_code = combine_svgs(text_svg_code, clean_svg_code)
+    combined_svg_filename = f"combined_svg_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}.svg"
+    combined_svg_path = os.path.join(IMAGES_DIR, combined_svg_filename)
+    with open(combined_svg_path, 'w') as f:
+        f.write(combined_svg_code)
 
-        # Save the image for vtracer processing
-        image_data = base64.b64decode(image_base64)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        input_filename = f"parallel_input_{timestamp}_{uuid.uuid4().hex[:8]}.png"
-        input_filepath = os.path.join(PARALLEL_OUTPUTS_DIR, input_filename)
-        
-        with open(input_filepath, "wb") as f:
-            f.write(image_data)
-        logger.info(f'Input image saved: {input_filepath}')
+    # Create a session subfolder and move outputs there
+    session_folder = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+    output_folder = os.path.join(PARALLEL_OUTPUTS_DIR, session_folder)
+    os.makedirs(output_folder, exist_ok=True)
 
-        # Process with vtracer
-        output_svg = f"parallel_output_{timestamp}_{uuid.uuid4().hex[:8]}.svg"
-        output_filepath = os.path.join(PARALLEL_OUTPUTS_DIR, output_svg)
+    # Base URL for parallel outputs
+    base_url = '/static/images/parallel'
 
-        config = vtracer.Config(
-            color_mode="color",
-            hierarchical=False,
-            filter_speckle=4,
-            corner_threshold=60,
-            length_threshold=4.0,
-            splice_threshold=45,
-            path_precision=8,
-        )
-        
-        logger.info('Starting vtracer conversion...')
-        vtracer.convert_image_to_svg_path(
-            input_filepath,
-            output_filepath,
-            config
-        )
-        logger.info(f'Vtracer conversion complete: {output_filepath}')
+    # Move generated image into session folder
+    src_image = os.path.join(IMAGES_DIR, image_filename)
+    dst_image = os.path.join(output_folder, image_filename)
+    os.rename(src_image, dst_image)
 
-        # Read the generated SVG
-        with open(output_filepath, 'r') as f:
-            svg_code = f.read()
+    # Move text SVG into session folder
+    src_text_svg = os.path.join(IMAGES_DIR, text_svg_path)
+    dst_text_svg = os.path.join(output_folder, text_svg_path)
+    os.rename(src_text_svg, dst_text_svg)
 
-        # Save final SVG and return
-        svg_filename = save_svg(svg_code, prefix='parallel_svg')
-        logger.info(f'Final SVG saved: {svg_filename}')
-        
-        return {
-            'original_prompt': user_input,
-            'image_url': f'/static/images/{image_filename}',
-            'svg_code': svg_code,
-            'svg_path': svg_filename,
-            'stage': 'complete'
-        }
+    # Move cleaned SVG into session folder
+    if not os.path.isabs(clean_svg_path):
+        src_clean_svg = os.path.join(os.getcwd(), clean_svg_path)
+    else:
+        src_clean_svg = clean_svg_path
+    dst_clean_svg = os.path.join(output_folder, os.path.basename(clean_svg_path))
+    os.rename(src_clean_svg, dst_clean_svg)
 
-    except Exception as e:
-        logger.error(f"Error in parallel SVG pipeline: {str(e)}")
-        logger.error(traceback.format_exc())
-        return {'error': str(e), 'stage': 'failed'}, 500
+    # Move combined SVG into session folder
+    src_combined_svg = combined_svg_path
+    dst_combined_svg = os.path.join(output_folder, combined_svg_filename)
+    os.rename(src_combined_svg, dst_combined_svg)
 
- 
+    # Move cleaned PNG (converter input) into session folder
+    src_edited_png = edited_png_path if os.path.isabs(edited_png_path) else edited_png_path
+    dst_edited_png = os.path.join(output_folder, os.path.basename(edited_png_path))
+    os.rename(src_edited_png, dst_edited_png)
+    edited_png_url = f"{base_url}/{session_folder}/{os.path.basename(edited_png_path)}"
+
+    # Construct URLs for client access
+    image_url = f"{base_url}/{session_folder}/{image_filename}"
+    text_svg_url = f"{base_url}/{session_folder}/{text_svg_path}"
+    clean_svg_url = f"{base_url}/{session_folder}/{os.path.basename(clean_svg_path)}"
+    combined_svg_url = f"{base_url}/{session_folder}/{combined_svg_filename}"
+
+    return jsonify({
+        'original_prompt': user_input,
+        'image_url': image_url,
+        'edited_png': {
+            'path': f"parallel/{session_folder}/{os.path.basename(edited_png_path)}",
+            'url': edited_png_url
+        },
+        'text_svg': {
+            'code': text_svg_code,
+            'path': f"parallel/{session_folder}/{text_svg_path}"
+        },
+        'clean_svg': {
+            'code': clean_svg_code,
+            'path': f"parallel/{session_folder}/{os.path.basename(clean_svg_path)}"
+        },
+        'combined_svg': {
+            'code': combined_svg_code,
+            'path': f"parallel/{session_folder}/{combined_svg_filename}",
+            'url': combined_svg_url
+        },
+        'stage': 8
+    })
+
+@app.route('/')
+def home():
+    """Home page with API documentation"""
+    return {
+        "message": "SVG Generation API Server",
+        "version": "1.0.0",
+        "endpoints": {
+            "/api/generate-svg": "POST - Generate SVG from text prompt",
+            "/api/generate-parallel-svg": "POST - Generate SVG using parallel pipeline", 
+            "/api/chat-assistant": "POST - Chat with AI assistant",
+            "/static/images/<filename>": "GET - Serve generated images",
+            "/health": "GET - Health check endpoint"
+        },
+        "status": "running"
+    }
+
+@app.route('/health')
+def health_check():
+    """Health check endpoint for deployment platforms"""
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+if __name__ == '__main__':
+    # Use PORT environment variable or default to 5004
+    port = int(os.environ.get('PORT', 8000))
+    host = os.environ.get('HOST', '127.0.0.1')
+    debug = os.environ.get('DEBUG', 'True').lower() == 'true'
+    
+    logger.info(f"Starting Flask app on {host}:{port} (debug={debug})")
+    app.run(host=host, port=port, debug=debug) 

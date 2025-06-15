@@ -1,7 +1,5 @@
 from flask import Flask, request, jsonify, send_from_directory
 import os
-import sys
-import traceback
 import requests
 import json
 import logging
@@ -15,67 +13,10 @@ import openai
 import uuid
 from datetime import datetime
 from dotenv import load_dotenv
-import vtracer
-from concurrent.futures import ThreadPoolExecutor
-import pytesseract
-import numpy as np
-import remove_text_simple
-import png_to_svg_converter
-from utils import (
-    STATIC_DIR,
-    IMAGES_DIR,
-    save_image,
-    save_svg,
-    generate_image_with_gpt
-)
-from shared_functions import (
-    check_vector_suitability,
-    plan_design,
-    generate_design_knowledge,
-    pre_enhance_prompt,
-    enhance_prompt_with_chat
-)
-from parallel_svg_pipeline import generate_parallel_svg_pipeline, init_parallel_pipeline
+# import vtracer  # Add vtracer import - temporarily disabled due to Render compilation issues
 
 # Load environment variables
 load_dotenv()
-
-# Configure basic logging first
-import logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    stream=sys.stdout  # Ensure logs go to stdout for Render
-)
-logger = logging.getLogger(__name__)
-
-# API configuration
-OPENAI_API_KEY_ENHANCER = os.getenv('OPENAI_API_KEY_ENHANCER')
-OPENAI_API_KEY_SVG = os.getenv('OPENAI_API_KEY_SVG')
-OPENAI_API_BASE = "https://api.openai.com/v1"
-OPENAI_CHAT_ENDPOINT = f"{OPENAI_API_BASE}/chat/completions"
-
-# Model names (using low OpenAI models that are widely available)
-PLANNER_MODEL = "gpt-4o-mini"
-DESIGN_KNOWLEDGE_MODEL = "gpt-4o-mini"
-PRE_ENHANCER_MODEL = "gpt-4o-mini"
-PROMPT_ENHANCER_MODEL = "gpt-4o-mini"
-GPT_IMAGE_MODEL = "gpt-image-1"
-SVG_GENERATOR_MODEL = "gpt-4o-mini"
-CHAT_ASSISTANT_MODEL = "gpt-4o-mini"
-
-try:
-    # Initialize parallel pipeline
-    vtracer_available = init_parallel_pipeline()
-    if vtracer_available:
-        logger.info("Parallel SVG pipeline ready with full vtracer support")
-    else:
-        logger.info("Parallel SVG pipeline initialized with limited functionality")
-except Exception as e:
-    logger.error(f"Failed to initialize parallel pipeline: {str(e)}")
-    logger.error(traceback.format_exc())
-    logger.warning("Continuing without parallel pipeline support")
-    vtracer_available = False
 
 app = Flask(__name__)
 
@@ -110,25 +51,370 @@ STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
 IMAGES_DIR = os.path.join(STATIC_DIR, 'images')
 os.makedirs(IMAGES_DIR, exist_ok=True)
 
-# Directory for parallel pipeline outputs
-PARALLEL_OUTPUTS_DIR = os.path.join(IMAGES_DIR, 'parallel')
-os.makedirs(PARALLEL_OUTPUTS_DIR, exist_ok=True)
+# API keys
+OPENAI_API_KEY_ENHANCER = os.getenv('OPENAI_API_KEY_ENHANCER')
+OPENAI_API_KEY_SVG = os.getenv('OPENAI_API_KEY_SVG')
 
 if not OPENAI_API_KEY_ENHANCER or not OPENAI_API_KEY_SVG:
     raise ValueError("OpenAI API keys must be set in environment variables")
 
-# OpenAI client setup
+# OpenAI client setupkk
 openai.api_key = OPENAI_API_KEY_SVG
 
-# Instantiate a GPT client for chat completions (parallel pipeline)
-from openai import OpenAI
-chat_client = OpenAI()
+# OpenAI API Endpoints
+OPENAI_API_BASE = "https://api.openai.com/v1"
+OPENAI_CHAT_ENDPOINT = f"{OPENAI_API_BASE}/chat/completions"
 
+# Model names - updated to use GPT-4.1 mini for logic/text and gpt-image for images
+PLANNER_MODEL = "gpt-4.1-nano"
+DESIGN_KNOWLEDGE_MODEL = "gpt-4.1-nano"
+PRE_ENHANCER_MODEL = "gpt-4.1-nano"
+PROMPT_ENHANCER_MODEL = "gpt-4.1-nano"
+GPT_IMAGE_MODEL = "gpt-image-1"
+SVG_GENERATOR_MODEL = "gpt-4.1-nano"
+CHAT_ASSISTANT_MODEL = "gpt-4.1-nano"
 
+# Add parallel SVG processing imports
+from concurrent.futures import ThreadPoolExecutor
+import pytesseract
+import numpy as np
 
+# Add after existing imports
+try:
+    import vtracer
+    import remove_text_simple
+    import png_to_svg_converter
+    PARALLEL_FEATURES_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Parallel SVG features not available: {e}")
+    PARALLEL_FEATURES_AVAILABLE = False
 
+# Add after existing directory setup
+PARALLEL_OUTPUTS_DIR = os.path.join(IMAGES_DIR, 'parallel')
+os.makedirs(PARALLEL_OUTPUTS_DIR, exist_ok=True)
 
+def check_vector_suitability(user_input):
+    """Check if the prompt is suitable for SVG vector graphics"""
+    logger.info(f"Checking vector suitability for: {user_input[:100]}...")
+    
+    url = OPENAI_CHAT_ENDPOINT
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
+    }
 
+    payload = {
+        "model": PLANNER_MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": """You are a vector graphics expert. Your task is to determine if a design request is suitable for SVG vector graphics.
+
+Guidelines for SVG suitability:
+1. Ideal for logos, icons, illustrations, typography, and geometric designs
+2. Good for flat or minimalist designs
+3. Suitable for designs with clear shapes and paths
+4. Works well with text and typography
+5. Perfect for scalable graphics without loss of quality
+
+Not suitable for:
+1. Photorealistic images
+2. Complex textures and gradients
+3. Designs requiring many minute details
+4. Photographs or photo manipulations
+5. Complex 3D renderings
+
+Provide guidance if the request isn't suitable."""
+            },
+            {
+                "role": "user",
+                "content": user_input
+            }
+        ],
+        "temperature": 0.7,
+        "max_tokens": 500
+    }
+
+    response = requests.post(url, headers=headers, json=payload)
+    response_data = response.json()
+
+    if response.status_code != 200:
+        logger.error(f"Vector suitability check error: {response_data}")
+        return {"not_suitable": False}  # Default to allowing if check fails
+
+    analysis = response_data["choices"][0]["message"]["content"].lower()
+    not_suitable = "not suitable" in analysis or "unsuitable" in analysis
+    
+    return {
+        "not_suitable": not_suitable,
+        "guidance": response_data["choices"][0]["message"]["content"] if not_suitable else None
+    }
+
+def plan_design(user_input):
+    """Plan the design approach based on user input"""
+    logger.info(f"Planning design for: {user_input[:100]}...")
+    
+    url = OPENAI_CHAT_ENDPOINT
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
+    }
+
+    payload = {
+        "model": PLANNER_MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": """You are a design planner specializing in high-quality posters, logos, and branding materials. Create a structured plan for the user's request that focuses on visual impact, cohesive color themes, and professional composition.
+
+Your plan should include:
+1. Design Goals
+   - Main purpose and intended use (e.g., poster, logo)
+   - Target audience and mood
+   - Key message and visual emotion
+
+2. Visual Composition
+   - Overall layout structure and focal points
+   - Background elements (colors, gradients, textures)
+   - Visual hierarchy and balance
+
+3. Typography and Style
+   - Font choices, sizes, and pairings
+   - Spacing, alignment, and hierarchy
+
+4. Color and Branding
+   - Suggested color palette with hex/RGB codes
+   - Background and accent color recommendations
+   - Mood or theme descriptors (e.g., vibrant, minimal, elegant)
+
+5. Technical and Production Considerations
+   - SVG optimization requirements and file size targets
+   - Responsive design and browser compatibility
+   - Logo integration and branding guidelines
+
+6. Implementation Strategy
+   - Component breakdown and creation order
+   - Special effects or patterns (shadows, overlays)
+   - Testing and validation steps
+
+Be specific, practical, and focus on creating a visually compelling poster or logo that aligns with the user's request."""
+            },
+            {
+                "role": "user",
+                "content": user_input
+            }
+        ],
+        "temperature": 0.7,
+        "max_tokens": 1000
+    }
+
+    response = requests.post(url, headers=headers, json=payload)
+    response_data = response.json()
+
+    if response.status_code != 200:
+        logger.error(f"Design planning error: {response_data}")
+        return "Error in design planning"
+
+    return response_data["choices"][0]["message"]["content"]
+
+def generate_design_knowledge(design_plan, user_input):
+    """Generate specific design knowledge based on the plan and user input"""
+    logger.info("Generating design knowledge...")
+    
+    url = OPENAI_CHAT_ENDPOINT
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
+    }
+
+    payload = {
+        "model": DESIGN_KNOWLEDGE_MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": """You are a design knowledge expert specializing in professional poster and logo creation. Based on the design plan and user request, provide detailed insights, best practices, and actionable recommendations to enhance visual quality and impact.
+
+Include:
+1. Typography and Branding
+   - Font recommendations with pairing suggestions
+   - Hierarchy and spacing for emphasis
+   - Logo integration tips
+
+2. Color and Mood
+   - Cohesive color palette suggestions with hex/RGB values
+   - Contrast, accessibility, and readability guidance
+   - Background color and texture ideas for mood
+
+3. Layout and Composition
+   - Effective grid systems and alignment techniques
+   - Focal point emphasis and visual flow strategies
+   - Balanced use of whitespace and dynamic elements
+
+4. SVG and Graphic Techniques
+   - Path and shape optimization for crisp visuals
+   - Use of overlays, shadows, gradients, and textures
+   - Grouping and layer organization for clarity
+
+5. Technical and Production
+   - Responsive design tips for multiple screen sizes
+   - SVG file size optimization and performance
+   - Cross-browser compatibility considerations
+
+Provide clear, practical recommendations to elevate the design quality for posters, logos, and branding materials."""
+            },
+            {
+                "role": "user",
+                "content": f"Design Plan:\n{design_plan}\n\nUser Request:\n{user_input}"
+            }
+        ],
+        "temperature": 0.7,
+        "max_tokens": 1500
+    }
+
+    response = requests.post(url, headers=headers, json=payload)
+    response_data = response.json()
+
+    if response.status_code != 200:
+        logger.error(f"Design knowledge generation error: {response_data}")
+        return "Error in generating design knowledge"
+
+    return response_data["choices"][0]["message"]["content"]
+
+def pre_enhance_prompt(user_input):
+    """Initial enhancement of user query using standard GPT-4o mini"""
+    logger.info(f"Pre-enhancing prompt: {user_input[:100]}...")
+    
+    url = OPENAI_CHAT_ENDPOINT
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
+    }
+
+    payload = {
+        "model": PRE_ENHANCER_MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": """You are an expert design prompt enhancer. Enhance the user's design request into a highly detailed, technical specification optimized for creating professional-quality posters, logos, and branding materials.
+
+Your enhanced prompt should include:
+1. Layout and Composition
+   - Overall structure and visual flow
+   - Focal points and visual hierarchy
+   - Balance, symmetry, and use of whitespace
+
+2. Typography
+   - Font styles and families with pairing recommendations
+   - Font sizes with emphasis hierarchy
+   - Text alignment and letter spacing
+
+3. Color and Atmosphere
+   - Cohesive color palette suggestions with hex/RGB codes
+   - Background colors, gradients, and texture ideas
+   - Mood and style descriptors (e.g., vibrant, elegant, minimalist)
+
+4. Visual Elements and Branding
+   - Background graphics, patterns, or images
+   - Icons, symbols, and decorative shapes
+   - Logo placement and integration tips
+
+5. Technical Requirements
+   - SVG-specific considerations and optimization techniques
+   - Responsive design and scaling guidelines
+   - Browser compatibility and performance optimizations
+
+6. Poster and Logo Aesthetics
+   - Recommendations for cohesion between elements
+   - Suggestions for lighting, shadow, and depth
+   - Tips for making the design stand out visually
+
+Convert the user's brief into a complete, actionable prompt that maintains their original intent while adding all necessary details to produce a visually compelling and professional SVG design."""
+            },
+            {
+                "role": "user",
+                "content": user_input
+            }
+        ],
+        "temperature": 0.7,
+        "max_tokens": 1500
+    }
+
+    logger.info(f"Calling OpenAI Chat API for initial prompt enhancement with model: {PRE_ENHANCER_MODEL}")
+    response = requests.post(url, headers=headers, json=payload)
+    response_data = response.json()
+
+    if response.status_code != 200:
+        logger.error(f"OpenAI API error: {response_data}")
+        logger.error(f"Response status code: {response.status_code}")
+        logger.error(f"Response headers: {response.headers}")
+        raise Exception(f"OpenAI API error: {response_data.get('error', {}).get('message', 'Unknown error')}")
+
+    enhanced_prompt = response_data["choices"][0]["message"]["content"]
+    logger.info(f"Successfully enhanced prompt. Result: {enhanced_prompt[:100]}...")
+    return enhanced_prompt
+
+def enhance_prompt_with_chat(user_input):
+    """Enhance user prompt using Chat Completions API"""
+    url = OPENAI_CHAT_ENDPOINT
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
+    }
+
+    payload = {
+        "model": PROMPT_ENHANCER_MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": """You are an advanced SVG design prompt optimizer specializing in high-impact posters and logo creation. Enhance the pre-enhanced design prompt to ensure the resulting SVG is visually stunning, cohesive, and technically precise.
+
+Your optimization should address:
+1. Vector and Visual Optimization
+   - Emphasize vector-friendly shapes, paths, and curves
+   - Define gradients, patterns, and textures for backgrounds
+   - Recommend shadows, overlays, and depth for visual appeal
+
+2. Technical Precision
+   - Exact dimensions, positions, and aspect ratios
+   - Precise color values (HEX/RGB) with contrast considerations
+   - Font specifications, including web-safe fallbacks and loading strategies
+
+3. Component and Layer Organization
+   - Grouping of elements for reuse and clarity
+   - IDs and classes for styling and interactivity
+   - Organized layering to control visual stacking and effects
+
+4. Performance and Accessibility
+   - Optimize paths to minimize file size and complexity
+   - Ensure responsive scaling and cross-browser performance
+   - Add ARIA labels and semantic structure for accessibility
+
+5. Poster and Branding Details
+   - Specify background elements (colors, gradients, patterns)
+   - Suggest lighting, shadow, and texture to create depth
+   - Recommend cohesive color themes and mood descriptors
+   - Integrate logo placement and branding cues
+
+Ensure the final prompt guides the SVG generator to produce a complete, eye-catching poster or logo design with a well-defined background, color theme, and professional quality."""
+            },
+            {
+                "role": "user",
+                "content": user_input
+            }
+        ],
+        "temperature": 0.7,
+        "max_tokens": 2000
+    }
+
+    logger.info(f"Calling OpenAI Chat API for prompt enhancement with model: {PROMPT_ENHANCER_MODEL}")
+    response = requests.post(url, headers=headers, json=payload)
+    response_data = response.json()
+
+    if response.status_code != 200:
+        logger.error(f"OpenAI API error: {response_data}")
+        raise Exception(f"OpenAI API error: {response_data.get('error', {}).get('message', 'Unknown error')}")
+
+    return response_data["choices"][0]["message"]["content"]
 
 def enhance_prompt_for_gpt_image(user_prompt, design_context=None):
     """Enhance user prompt specifically for GPT Image-1 to create better designs"""
@@ -276,27 +562,12 @@ def generate_image_with_gpt(enhanced_prompt, design_context=None):
             model=GPT_IMAGE_MODEL,
             prompt=optimized_prompt,
             size="1024x1024",
-            quality="medium"   # Using medium quality - gpt-image-1 supports: low, medium, high, auto
-            # Note: response_format parameter is not supported by gpt-image-1 (always returns b64_json)
+            quality="low"   # Changed from "low" to "standard" for better quality
         )
 
         # Get base64 image data from the response
-        if response.data and len(response.data) > 0:
-            image_data = response.data[0]
-            if hasattr(image_data, 'b64_json') and image_data.b64_json:
-                image_base64 = image_data.b64_json
-            elif hasattr(image_data, 'url') and image_data.url:
-                # If we got a URL instead, download the image and convert to base64
-                import requests
-                img_response = requests.get(image_data.url)
-                if img_response.status_code == 200:
-                    image_base64 = base64.b64encode(img_response.content).decode('utf-8')
-                else:
-                    raise Exception(f"Failed to download image from URL: {image_data.url}")
-            else:
-                raise Exception("No valid image data found in response")
-        else:
-            raise Exception("Empty response data from OpenAI API")
+        # The response structure changed in newer versions of the API
+        image_base64 = response.data[0].b64_json if hasattr(response.data[0], 'b64_json') else response.data[0].url
 
         # Save the generated image
         filename = save_image(image_base64, prefix="gpt_image")
@@ -308,59 +579,12 @@ def generate_image_with_gpt(enhanced_prompt, design_context=None):
         raise
 
 def generate_svg_from_image(image_base64, enhanced_prompt):
-    """Generate SVG code from image using vtracer"""
-    logger.info("SVG generation from image requested")
+    """Generate SVG code from image - vtracer temporarily disabled for deployment"""
+    logger.info("SVG generation from image requested - vtracer temporarily disabled")
     
-    try:
-        import vtracer
-        import tempfile
-        import os
-        
-        # Decode base64 image
-        image_data = base64.b64decode(image_base64)
-        
-        # Save to temporary file
-        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
-            tmp_file.write(image_data)
-            tmp_input_path = tmp_file.name
-        
-        # Generate temporary output path
-        tmp_output_path = tmp_input_path.replace('.png', '.svg')
-        
-        # Convert image to SVG using vtracer with optimized settings
-        vtracer.convert_image_to_svg_py(
-            tmp_input_path,
-            tmp_output_path,
-            colormode='color',
-            hierarchical='stacked',
-            mode='spline',
-            filter_speckle=4,
-            color_precision=6,
-            layer_difference=16,
-            corner_threshold=60,
-            length_threshold=4.0,
-            max_iterations=10,
-            splice_threshold=45,
-            path_precision=3
-        )
-        
-        # Read the generated SVG
-        with open(tmp_output_path, 'r') as f:
-            svg_code = f.read()
-        
-        # Clean up temporary files
-        os.unlink(tmp_input_path)
-        os.unlink(tmp_output_path)
-        
-        logger.info("SVG generated successfully from image")
-        return svg_code
-        
-    except ImportError:
-        logger.error("vtracer not available - falling back to alternative method")
-        raise NotImplementedError("vtracer not available for image-to-SVG conversion")
-    except Exception as e:
-        logger.error(f"Error in image-to-SVG conversion: {str(e)}")
-        raise
+    # For now, return a message indicating vtracer is disabled
+    # In the future, you can implement an alternative approach or re-enable vtracer
+    raise NotImplementedError("Image-to-SVG conversion temporarily disabled due to deployment constraints. Please use text-based SVG generation instead.")
 
 def clean_svg_code_original(svg_code):
     """Original clean and validate SVG code function"""
@@ -392,6 +616,45 @@ def clean_svg_code_original(svg_code):
         logger.error(f"Error cleaning SVG: {str(error)}")
         return svg_code
 
+def save_image(image_data, prefix="img", format="PNG"):
+    """Save image data to file and return the filename"""
+    try:
+        # Generate unique filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        unique_id = str(uuid.uuid4())[:8]
+        filename = f"{prefix}_{timestamp}_{unique_id}.{format.lower()}"
+        filepath = os.path.join(IMAGES_DIR, filename)
+
+        # Convert base64 to image and save
+        image_bytes = base64.b64decode(image_data)
+        image = Image.open(BytesIO(image_bytes))
+        image.save(filepath, format=format)
+        
+        logger.info(f"Image saved successfully: {filename}")
+        return filename
+    except Exception as e:
+        logger.error(f"Error saving image: {str(e)}")
+        raise
+
+def save_svg(svg_code, prefix="svg"):
+    """Save SVG code to file and return the filename"""
+    try:
+        # Generate unique filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        unique_id = str(uuid.uuid4())[:8]
+        filename = f"{prefix}_{timestamp}_{unique_id}.svg"
+        filepath = os.path.join(IMAGES_DIR, filename)
+
+        # Save SVG code to file
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(svg_code)
+        
+        logger.info(f"SVG saved successfully: {filename}")
+        return filename
+    except Exception as e:
+        logger.error(f"Error saving SVG: {str(e)}")
+        raise
+
 def convert_svg_to_png(svg_code):
     """Convert SVG code to PNG and save both files"""
     try:
@@ -417,6 +680,30 @@ def convert_svg_to_png(svg_code):
 def serve_image(filename):
     """Serve images from the images directory"""
     return send_from_directory(IMAGES_DIR, filename)
+
+@app.route('/static/images/parallel/<path:session_folder>/<path:filename>')
+def serve_parallel_image(session_folder, filename):
+    """Serve images from the parallel pipeline directory"""
+    parallel_path = os.path.join(PARALLEL_OUTPUTS_DIR, session_folder)
+    return send_from_directory(parallel_path, filename)
+
+@app.route('/api/projects/templates', methods=['GET'])
+def get_templates():
+    """Mock templates endpoint - returns empty templates for now"""
+    page = request.args.get('page', '1')
+    limit = request.args.get('limit', '4')
+    
+    # Return empty templates response for now
+    # TODO: Implement actual templates functionality
+    return jsonify({
+        "data": [],
+        "pagination": {
+            "page": int(page),
+            "limit": int(limit),
+            "total": 0,
+            "totalPages": 0
+        }
+    })
 
 @app.route('/api/generate-svg', methods=['POST'])
 def generate_svg():
@@ -797,115 +1084,40 @@ def chat_assistant():
                 image_base64, image_filename = generate_image_with_gpt(enhanced_prompt, design_context)
                 logger.info(f"Image generated and saved as: {image_filename}")
                 
-                # Stage 6: SVG Generation (Basic)
-                logger.info("\n[STAGE 6: SVG Generation (Basic)]")
+                # Stage 6: SVG Generation
+                logger.info("\n[STAGE 6: SVG Generation]")
                 logger.info("-"*50)
                 logger.info("Converting design to SVG format...")
                 logger.info(f"Using model: {SVG_GENERATOR_MODEL}")
-                basic_svg_code = generate_svg_from_image(image_base64, enhanced_prompt)
-                basic_svg_filename = save_svg(basic_svg_code, prefix="basic_svg")
-                logger.info(f"Basic SVG generated and saved as: {basic_svg_filename}")
+                svg_code = generate_svg_from_image(image_base64, enhanced_prompt)
+                svg_filename = save_svg(svg_code, prefix="assistant_svg")
+                logger.info(f"SVG generated and saved as: {svg_filename}")
                 
-                # Decode image for parallel processing
-                image_data = base64.b64decode(image_base64)
-
-                # Stage 7: Text SVG Generation using OCR + AI
-                logger.info("\n[STAGE 7: Text SVG Generation (OCR + AI)]")
-                logger.info("-"*50)
-                try:
-                    text_svg_code, text_svg_filename = process_ocr_svg(image_data)
-                    logger.info(f"Text SVG generated: {text_svg_filename}")
-                except Exception as e:
-                    logger.error(f"Text SVG generation failed: {str(e)}")
-                    text_svg_code = '<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080"></svg>'
-                    text_svg_filename = 'fallback_text.svg'
-
-                # Stage 8: Traced SVG Generation (Clean background)
-                logger.info("\n[STAGE 8: Traced SVG Generation (Clean Background)]")
-                logger.info("-"*50)
-                try:
-                    if vtracer_available:
-                        traced_svg_code, traced_svg_path, edited_png_path = process_clean_svg(image_data)
-                        logger.info(f"Traced SVG generated: {traced_svg_path}")
-                    else:
-                        # Fallback: Use simple converter on original image
-                        logger.info("vtracer not available, using simple conversion")
-                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                        temp_input_path = os.path.join(PARALLEL_OUTPUTS_DIR, f"simple_input_{timestamp}_{uuid.uuid4().hex[:8]}.png")
-                        with open(temp_input_path, "wb") as f:
-                            f.write(image_data)
-                        
-                        traced_svg_path = os.path.join(PARALLEL_OUTPUTS_DIR, f"simple_traced_{timestamp}.svg")
-                        png_to_svg_converter.convert_png_to_svg(temp_input_path, traced_svg_path)
-                        
-                        with open(traced_svg_path, 'r') as f:
-                            traced_svg_code = f.read()
-                        
-                        os.remove(temp_input_path)
-                        edited_png_path = None
-                        
-                except Exception as e:
-                    logger.error(f"Traced SVG generation failed: {str(e)}")
-                    traced_svg_code = '<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080"></svg>'
-                    traced_svg_path = 'fallback_traced.svg'
-                    edited_png_path = None
-
-                # Stage 9: Combine Text SVG + Traced SVG
-                logger.info("\n[STAGE 9: Combining Text SVG + Traced SVG]")
-                logger.info("-"*50)
-                try:
-                    combined_svg_code = combine_svgs(text_svg_code, traced_svg_code)
-                    logger.info("SVG combination completed successfully")
-                except Exception as e:
-                    logger.error(f"SVG combination failed: {str(e)}")
-                    logger.info("Using simple combination fallback")
-                    combined_svg_code = simple_combine_svgs(text_svg_code, traced_svg_code)
-
-                # Save the final combined SVG
-                combined_svg_filename = save_svg(combined_svg_code, prefix='combined_svg')
-                logger.info(f"Final combined SVG saved: {combined_svg_filename}")
-                
-                # Stage 10: Design Explanation
-                logger.info("\n[STAGE 10: Design Explanation]")
+                # Stage 7: Design Explanation
+                logger.info("\n[STAGE 7: Design Explanation]")
                 logger.info("-"*50)
                 logger.info("Generating design explanation...")
                 logger.info(f"Using model: {CHAT_ASSISTANT_MODEL}")
                 
-                # Use a simple explanation without passing SVG content to avoid token limits
-                explanation_prompt = "I've created a comprehensive design with multiple SVG versions. Briefly explain this design to the user in a friendly way, mentioning that they have: 1) Original image, 2) Basic SVG, 3) Text-only SVG, 4) Background-only SVG, and 5) Combined SVG. Keep it under 200 words."
+                explanation_prompt = f"I've created a design for the user. Here's the SVG code:\n\n```svg\n{svg_code}\n```\n\nPlease explain this design to the user in a friendly, conversational way. Describe the elements, colors, layout, and how it addresses their request."
                 
-                try:
-                    # Use a simple message without the SVG content to avoid token limits
-                    temp_messages = [{"role": "user", "content": explanation_prompt}]
-                    ai_explanation = chat_with_ai_about_design(temp_messages, None)  # Pass None for SVG to avoid token limit
-                except Exception as e:
-                    logger.error(f"Explanation generation failed: {str(e)}")
-                    ai_explanation = "I've created your design with multiple versions! You now have a complete set including the original image, basic SVG, text-only SVG, background-only SVG, and a combined version that merges text and background elements perfectly."
+                temp_messages = messages + [{"role": "user", "content": explanation_prompt}]
+                ai_explanation = chat_with_ai_about_design(temp_messages, svg_code)
                 
                 logger.info("\nExplanation Generated:")
-                for line in ai_explanation.split('\n')[:3]:
+                for line in ai_explanation.split('\n')[:5]:
                     logger.info(f"  {line}")
                 logger.info("  ...")
                 
-                # Create comprehensive response with all versions
-                full_response = f"{ai_explanation}\n\n**Final Combined SVG:**\n```svg\n{combined_svg_code}\n```\n\nFeel free to ask me to modify any aspect of this design!"
+                # Create comprehensive response
+                full_response = f"{ai_explanation}\n\n```svg\n{svg_code}\n```\n\nFeel free to ask me to modify any aspect of this design!"
                 
                 messages.append({"role": "assistant", "content": full_response})
                 
                 response_data = {
                     "response": full_response,
-                    "svg_code": combined_svg_code,
-                    "svg_path": combined_svg_filename,
-                    "basic_svg_code": basic_svg_code,
-                    "basic_svg_path": basic_svg_filename,
-                    "text_svg_code": text_svg_code,
-                    "text_svg_path": text_svg_filename,
-                    "traced_svg_code": traced_svg_code,
-                    "traced_svg_path": traced_svg_path,
-                    "image_base64": image_base64,
-                    "image_url": f"/static/images/{image_filename}",
-                    "edited_png_path": edited_png_path,
-                    "pipeline_type": "full_parallel_chat",
+                    "svg_code": svg_code,
+                    "svg_path": svg_filename,
                     "messages": messages
                 }
                 
@@ -916,10 +1128,7 @@ def chat_assistant():
                 logger.info(f"- Design knowledge gathered")
                 logger.info(f"- Prompt enhanced and refined")
                 logger.info(f"- Image generated: {image_filename}")
-                logger.info(f"- Basic SVG created: {basic_svg_filename}")
-                logger.info(f"- Text SVG created: {text_svg_filename}")
-                logger.info(f"- Traced SVG created: {traced_svg_path}")
-                logger.info(f"- Combined SVG created: {combined_svg_filename}")
+                logger.info(f"- SVG created: {svg_filename}")
                 logger.info(f"- Explanation provided")
                 logger.info("="*80)
                 
@@ -991,31 +1200,79 @@ def chat_assistant():
         logger.exception("Full traceback:")
         return jsonify({"error": error_msg}), 500
 
-# Parallel SVG Pipeline Functions
-def process_image_parallel(image_base64, enhanced_prompt):
-    """Process image in parallel using multiple techniques including text SVG"""
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        # Submit tasks
-        vtracer_future = executor.submit(process_vtracer, image_base64)
-        text_future = executor.submit(process_text_extraction, image_base64)
-        simple_future = executor.submit(process_simple_conversion, image_base64)
-        text_svg_future = executor.submit(process_text_svg_generation, image_base64, enhanced_prompt)
-        
-        # Gather results
-        results = {
-            'vtracer': vtracer_future.result(),
-            'text': text_future.result(),
-            'simple': simple_future.result(),
-            'text_svg': text_svg_future.result()
-        }
-        
-        return results
+def build_advanced_image_prompt(user_input, design_context):
+    """Build an advanced image prompt optimized for parallel SVG processing"""
+    
+    # Analyze user input for design type and requirements
+    user_lower = user_input.lower()
+
+    # Design type detection with more specific categories
+    design_types = {
+        'poster': ['poster', 'flyer', 'announcement', 'event', 'coming soon', 'promotion'],
+        'logo': ['logo', 'brand', 'company', 'business', 'startup', 'identity'],
+        'card': ['card', 'testimonial', 'review', 'quote', 'recommendation'],
+        'banner': ['banner', 'header', 'cover', 'social media', 'facebook', 'instagram'],
+        'infographic': ['infographic', 'chart', 'data', 'statistics', 'info'],
+        'certificate': ['certificate', 'award', 'diploma', 'achievement'],
+        'invitation': ['invitation', 'invite', 'party', 'wedding', 'event'],
+        'menu': ['menu', 'restaurant', 'food', 'cafe', 'dining'],
+        'brochure': ['brochure', 'pamphlet', 'leaflet', 'booklet']
+    }
+
+    detected_type = 'general'
+    for design_type, keywords in design_types.items():
+        if any(keyword in user_lower for keyword in keywords):
+            detected_type = design_type
+            break
+
+    # Build prompt components
+    prompt_parts = []
+
+    # Core request with design type optimization
+    if detected_type == 'poster':
+        prompt_parts.append(f"Create a professional poster design: {user_input}")
+        prompt_parts.append("Design requirements: Bold typography, clear hierarchy, eye-catching visuals, structured layout")
+        prompt_parts.append("Visual style: High-impact graphics, vibrant colors, professional composition, marketing-focused")
+    elif detected_type == 'logo':
+        prompt_parts.append(f"Create a distinctive logo design: {user_input}")
+        prompt_parts.append("Design requirements: Simple memorable shapes, scalable graphics, clean typography, brand identity")
+        prompt_parts.append("Visual style: Minimalist approach, strong contrast, vector-friendly elements, timeless design")
+    else:
+        prompt_parts.append(f"Create a professional graphic design: {user_input}")
+        prompt_parts.append("Design requirements: Versatile layout, clear visual hierarchy, professional appearance, multi-purpose design")
+        prompt_parts.append("Visual style: Modern aesthetics, balanced composition, adaptable elements, universal appeal")
+
+    # Technical specifications for optimal SVG conversion
+    prompt_parts.append("Technical specs: 1024x1024 resolution, high contrast elements, clear edge definition, distinct boundaries")
+    prompt_parts.append("SVG optimization: Vector-friendly graphics, clean background separation, text-image distinction, sharp details")
+
+    # Quality and aesthetic requirements
+    prompt_parts.append("Quality standards: Professional finish, polished appearance, commercial-grade design, publication-ready")
+    prompt_parts.append("Color approach: Vibrant yet balanced palette, good contrast ratios, harmonious color scheme, brand-appropriate")
+
+    # Parallel processing optimization
+    prompt_parts.append("Processing optimization: Clear text-background separation, distinct graphic elements, OCR-friendly text placement")
+
+    # Combine all parts with separators
+    final_prompt = " || ".join(prompt_parts)
+
+    # Ensure prompt length is manageable
+    if len(final_prompt) > 1200:
+        # Keep the most important parts
+        essential_parts = prompt_parts[:4]  # Core request + technical specs
+        final_prompt = " || ".join(essential_parts)
+
+    return final_prompt
 
 def process_ocr_svg(image_data):
-    """Generate a text-only SVG using GPT-4o-mini by passing the image directly to the chat API."""
+    """Generate a text-only SVG using GPT-4.1-mini by passing the image directly to the chat API."""
+    if not PARALLEL_FEATURES_AVAILABLE:
+        raise NotImplementedError("Parallel features not available - missing dependencies")
+    
     # Base64-encode the PNG image
     img_b64 = base64.b64encode(image_data).decode('utf-8')
-    # Build prompts matching parallel_svg_pipeline.py style
+    
+    # Build prompts matching generate_svg_from_image style
     system_prompt = """You are an expert SVG code generator. Your task is to create precise, clean, and optimized SVG code that exactly matches the provided image. Follow these guidelines:
 1. Create SVG with dimensions 1080x1080 pixels
 2. Ensure perfect positioning and alignment of all elements
@@ -1030,34 +1287,39 @@ def process_ocr_svg(image_data):
 
 Focus on producing production-ready, clean SVG code that renders identically to the input image.
 Return ONLY the SVG code without any explanations or comments."""
+
     user_content = [
         {"type": "text", "text": "Generate an SVG that contains only text elements exactly as seen in the image."},
         {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_b64}"}}
     ]
+    
     # Call Chat Completions API directly to support image_url message
     payload = {
-        "model": CHAT_ASSISTANT_MODEL,
+        "model": "gpt-4.1-mini",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content}
         ],
-        "temperature": 0.7,
+        "temperature": 1,
         "max_tokens": 2000
     }
     
-    response = requests.post(OPENAI_CHAT_ENDPOINT, headers={
+    url = "https://api.openai.com/v1/chat/completions"
+    headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {OPENAI_API_KEY_SVG}"
-    }, json=payload)
+    }
     
+    response = requests.post(url, headers=headers, json=payload)
     data = response.json()
+    
     if response.status_code != 200:
         logger.error(f"Error generating text SVG: {data}")
         raise Exception("Text SVG generation failed")
     
     content = data["choices"][0]["message"]["content"]
+    
     # Extract the SVG
-    import re
     match = re.search(r'<svg.*?</svg>', content, re.DOTALL)
     svg_code = match.group(0) if match else content.strip()
     
@@ -1066,578 +1328,180 @@ Return ONLY the SVG code without any explanations or comments."""
     return svg_code, svg_filename
 
 def process_clean_svg(image_data):
-    """Process text removal and convert to clean SVG using vtracer"""
-    try:
-        # Save the original image bytes to a temporary PNG file
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        temp_input_path = os.path.join(PARALLEL_OUTPUTS_DIR, f"temp_input_{timestamp}_{uuid.uuid4().hex[:8]}.png")
-        with open(temp_input_path, "wb") as f:
-            f.write(image_data)
+    """Process text removal and convert to clean SVG"""
+    if not PARALLEL_FEATURES_AVAILABLE:
+        raise NotImplementedError("Parallel features not available - missing dependencies")
+    
+    # Save the original image bytes to a temporary PNG file
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    temp_input_path = f"temp_input_{timestamp}_{uuid.uuid4()}.png"
+    with open(temp_input_path, "wb") as f:
+        f.write(image_data)
 
+    try:
         # Remove text from the image using remove_text_simple
         edited_png_path = remove_text_simple.remove_text(temp_input_path)
 
         # Convert the edited PNG to SVG using vtracer with optimized settings
-        output_svg_path = os.path.join(PARALLEL_OUTPUTS_DIR, f"clean_{timestamp}_{uuid.uuid4().hex[:8]}.svg")
-        
-        if vtracer_available:
-            vtracer.convert_image_to_svg_py(
-                edited_png_path,
-                output_svg_path,
-                colormode='color',
-                hierarchical='stacked',
-                mode='spline',
-                filter_speckle=4,
-                color_precision=6,
-                layer_difference=16,
-                corner_threshold=60,
-                length_threshold=4.0,
-                max_iterations=10,
-                splice_threshold=45,
-                path_precision=3
-            )
-        else:
-            # Fallback to simple converter
-            png_to_svg_converter.convert_png_to_svg(edited_png_path, output_svg_path)
-
-        # Read the generated SVG content
-        with open(output_svg_path, 'r') as f:
-            clean_svg_code = f.read()
-
-        # Cleanup the temporary input file
-        os.remove(temp_input_path)
-
-        # Return clean SVG code and paths
-        return clean_svg_code, output_svg_path, edited_png_path
-        
-    except Exception as e:
-        logger.error(f"Error in process_clean_svg: {str(e)}")
-        raise
-
-def validate_and_clean_svg(svg_code):
-    """Validate and clean SVG code to ensure it's properly formatted."""
-    import re
-
-    # Ensure SVG starts and ends properly
-    if not svg_code.strip().startswith('<svg'):
-        # Try to find SVG content in the response
-        svg_match = re.search(r'(<svg.*?</svg>)', svg_code, re.DOTALL)
-        if svg_match:
-            svg_code = svg_match.group(1)
-        else:
-            logger.warning("No valid SVG found in response")
-            return svg_code
-
-    # Ensure proper namespace
-    if 'xmlns=' not in svg_code:
-        svg_code = svg_code.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"', 1)
-
-    # Ensure proper closing
-    if not svg_code.strip().endswith('</svg>'):
-        svg_code = svg_code.rstrip() + '</svg>'
-
-    # Clean up whitespace
-    svg_code = re.sub(r'\s+', ' ', svg_code)
-    svg_code = re.sub(r'>\s+<', '><', svg_code)
-
-    return svg_code.strip()
-
-def reduce_svg_content(svg_code, max_chars=50000):
-    """Reduce SVG content size by removing unnecessary elements and simplifying paths."""
-    import re
-
-    # Remove comments
-    svg_code = re.sub(r'<!--.*?-->', '', svg_code, flags=re.DOTALL)
-
-    # Remove unnecessary whitespace and newlines
-    svg_code = re.sub(r'\s+', ' ', svg_code)
-    svg_code = re.sub(r'>\s+<', '><', svg_code)
-
-    # Simplify path data by reducing precision
-    def simplify_path(match):
-        path_data = match.group(1)
-        # Reduce decimal precision to 2 places
-        path_data = re.sub(r'(\d+\.\d{3,})', lambda m: f"{float(m.group(1)):.2f}", path_data)
-        return f'd="{path_data}"'
-
-    svg_code = re.sub(r'd="([^"]*)"', simplify_path, svg_code)
-
-    # If still too large, truncate paths but keep structure
-    if len(svg_code) > max_chars:
-        logger.warning(f"SVG still too large ({len(svg_code)} chars), truncating paths")
-        # Keep the SVG header and first few paths
-        svg_parts = svg_code.split('<path')
-        if len(svg_parts) > 10:  # Keep only first 10 paths
-            truncated = svg_parts[0]
-            for i in range(1, min(11, len(svg_parts))):
-                truncated += '<path' + svg_parts[i]
-            # Ensure proper closing
-            if not truncated.endswith('</svg>'):
-                truncated += '</svg>'
-            svg_code = truncated
-
-    return svg_code
-
-def extract_svg_elements(svg_code):
-    """Extract different elements from SVG code."""
-    import re
-
-    # Extract styles
-    styles = re.findall(r'<style[^>]*>(.*?)</style>', svg_code, re.DOTALL)
-
-    # Extract defs (gradients, patterns, etc.)
-    defs = re.findall(r'<defs[^>]*>(.*?)</defs>', svg_code, re.DOTALL)
-
-    # Extract paths
-    paths = re.findall(r'<path[^>]*(?:/>|>.*?</path>)', svg_code, re.DOTALL)
-
-    # Extract text elements
-    texts = re.findall(r'<text[^>]*>.*?</text>', svg_code, re.DOTALL)
-
-    # Extract other shapes (rect, circle, ellipse, etc.)
-    shapes = re.findall(r'<(?:rect|circle|ellipse|polygon|polyline|line)[^>]*(?:/>|>.*?</(?:rect|circle|ellipse|polygon|polyline|line)>)', svg_code, re.DOTALL)
-
-    # Extract groups
-    groups = re.findall(r'<g[^>]*>.*?</g>', svg_code, re.DOTALL)
-
-    return {
-        'styles': styles,
-        'defs': defs,
-        'paths': paths,
-        'texts': texts,
-        'shapes': shapes,
-        'groups': groups
-    }
-
-def simple_combine_svgs(text_svg_code, traced_svg_code):
-    """Advanced SVG combination - properly merge all elements with correct layering."""
-    import re
-
-    logger.info('Using advanced SVG combination')
-
-    # Extract viewBox and dimensions from traced SVG (usually more accurate)
-    traced_viewbox = re.search(r'viewBox="([^"]*)"', traced_svg_code)
-    traced_width = re.search(r'width="([^"]*)"', traced_svg_code)
-    traced_height = re.search(r'height="([^"]*)"', traced_svg_code)
-
-    # Set default dimensions
-    viewbox = traced_viewbox.group(1) if traced_viewbox else "0 0 1080 1080"
-    width = traced_width.group(1) if traced_width else "1080"
-    height = traced_height.group(1) if traced_height else "1080"
-
-    # Extract elements from both SVGs
-    traced_elements = extract_svg_elements(traced_svg_code)
-    text_elements = extract_svg_elements(text_svg_code)
-
-    logger.info(f'Extracted elements - Traced: {len(traced_elements["paths"])} paths, Text: {len(text_elements["texts"])} texts')
-
-    # Build comprehensive combined SVG
-    combined_parts = []
-
-    # Start SVG with proper namespace and attributes
-    combined_parts.append(f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="{viewbox}">')
-
-    # Add styles from both SVGs
-    if text_elements['styles'] or traced_elements['styles']:
-        combined_parts.append('<style type="text/css"><![CDATA[')
-        for style in text_elements['styles'] + traced_elements['styles']:
-            combined_parts.append(style.strip())
-        combined_parts.append(']]></style>')
-
-    # Add defs from both SVGs
-    all_defs = text_elements['defs'] + traced_elements['defs']
-    if all_defs:
-        combined_parts.append('<defs>')
-        for def_content in all_defs:
-            combined_parts.append(def_content.strip())
-        combined_parts.append('</defs>')
-
-    # Add background layer (traced paths and shapes)
-    if traced_elements['paths'] or traced_elements['shapes'] or traced_elements['groups']:
-        combined_parts.append('<g id="background-layer" opacity="0.9">')
-
-        # Add traced paths (background graphics)
-        for path in traced_elements['paths']:
-            combined_parts.append(path)
-
-        # Add traced shapes
-        for shape in traced_elements['shapes']:
-            combined_parts.append(shape)
-
-        # Add traced groups
-        for group in traced_elements['groups']:
-            combined_parts.append(group)
-
-        combined_parts.append('</g>')
-
-    # Add foreground layer (text and text-related elements)
-    if text_elements['texts'] or text_elements['paths'] or text_elements['shapes'] or text_elements['groups']:
-        combined_parts.append('<g id="text-layer">')
-
-        # Add text paths (if any)
-        for path in text_elements['paths']:
-            combined_parts.append(path)
-
-        # Add text shapes
-        for shape in text_elements['shapes']:
-            combined_parts.append(shape)
-
-        # Add text groups
-        for group in text_elements['groups']:
-            combined_parts.append(group)
-
-        # Add text elements
-        for text in text_elements['texts']:
-            combined_parts.append(text)
-
-        combined_parts.append('</g>')
-
-    # Close SVG
-    combined_parts.append('</svg>')
-
-    # Join all parts
-    combined_svg = '\n'.join(combined_parts)
-
-    # Clean up the SVG
-    combined_svg = re.sub(r'\n\s*\n', '\n', combined_svg)  # Remove empty lines
-    combined_svg = re.sub(r'>\s+<', '><', combined_svg)     # Remove whitespace between tags
-
-    logger.info(f'Advanced combination completed - Final size: {len(combined_svg)} characters')
-    return combined_svg
-
-def combine_svgs(text_svg_code, traced_svg_code):
-    """Combine text and path SVGs using GPT-4o-mini to produce a unified SVG."""
-    import time
-    logger.info('Stage 8: Combining SVGs using HTTP API')
-
-    # Reduce content size to fit within token limits
-    original_text_size = len(text_svg_code.encode('utf-8')) if isinstance(text_svg_code, str) else len(text_svg_code)
-    original_path_size = len(traced_svg_code.encode('utf-8')) if isinstance(traced_svg_code, str) else len(traced_svg_code)
-    logger.info(f'Original sizes - Text SVG: {original_text_size} bytes, Traced SVG: {original_path_size} bytes')
-
-    # Reduce traced SVG size significantly as it's usually the largest
-    reduced_traced_svg = reduce_svg_content(traced_svg_code, max_chars=30000)
-    reduced_text_svg = reduce_svg_content(text_svg_code, max_chars=5000)
-
-    reduced_text_size = len(reduced_text_svg.encode('utf-8'))
-    reduced_path_size = len(reduced_traced_svg.encode('utf-8'))
-    logger.info(f'Reduced sizes - Text SVG: {reduced_text_size} bytes, Traced SVG: {reduced_path_size} bytes')
-
-    # Use a simpler combination approach if content is still too large
-    total_size = reduced_text_size + reduced_path_size
-    if total_size > 40000:  # Still too large, use simple combination
-        logger.info('Content still large, using simple combination approach')
-        return simple_combine_svgs(reduced_text_svg, reduced_traced_svg)
-
-    logger.info('Preparing HTTP API request for SVG combination')
-    system_prompt = """You are an expert SVG combiner. Your task is to create a single, complete SVG that combines vector paths (background) with text elements (foreground).
-
-REQUIREMENTS:
-1. Use viewBox and dimensions from the path SVG
-2. Include ALL styles, defs, and gradients from both SVGs
-3. Layer paths BEHIND text elements
-4. Preserve all text positioning and styling
-5. Ensure proper SVG structure with xmlns namespace
-6. Return ONLY the complete SVG code, no explanations
-
-STRUCTURE:
-- Start with <svg> tag with proper attributes
-- Include <style> and <defs> sections if present
-- Add background layer with paths/shapes
-- Add foreground layer with text elements
-- Close with </svg>"""
-
-    user_msg = f"BACKGROUND SVG (paths/shapes):\n{reduced_traced_svg}\n\nFOREGROUND SVG (text/labels):\n{reduced_text_svg}\n\nCombine these into one complete SVG with proper layering."
-    messages = [
-        {'role': 'system', 'content': system_prompt},
-        {'role': 'user', 'content': user_msg}
-    ]
-
-    # Prepare HTTP request
-    payload = {
-        'model': CHAT_ASSISTANT_MODEL,
-        'messages': messages,
-        'temperature': 0,
-        'max_tokens': 4000
-    }
-
-    start_time = time.time()
-    logger.info('Sending HTTP request to OpenAI API for SVG combination')
-    try:
-        resp = requests.post(OPENAI_CHAT_ENDPOINT, headers={
-            'Content-Type': 'application/json',
-            'Authorization': f"Bearer {OPENAI_API_KEY_SVG}"
-        }, json=payload, timeout=60)
-        
-        api_response_time = time.time() - start_time
-        logger.info(f'HTTP response received in {api_response_time:.2f} seconds')
-
-        if resp.status_code != 200:
-            logger.error(f'API Error: {resp.status_code} - {resp.text}')
-            logger.info('Falling back to simple combination')
-            return simple_combine_svgs(reduced_text_svg, reduced_traced_svg)
-
-        data = resp.json()
-        combined_svg = data['choices'][0]['message']['content'].strip()
-
-        # Extract SVG from response if wrapped in markdown
-        if '```' in combined_svg:
-            import re
-            svg_match = re.search(r'```(?:svg)?\s*(.*?)\s*```', combined_svg, re.DOTALL)
-            if svg_match:
-                combined_svg = svg_match.group(1).strip()
-
-        # Validate and clean the SVG
-        combined_svg = validate_and_clean_svg(combined_svg)
-
-        combined_size = len(combined_svg.encode('utf-8'))
-        logger.info(f'Combined SVG size: {combined_size} bytes')
-        total_time = time.time() - start_time
-        logger.info(f'SVG combination completed in {total_time:.2f} seconds total')
-        return combined_svg
-
-    except Exception as e:
-        logger.error(f'API Error during SVG combination: {str(e)}')
-        logger.info('Falling back to simple combination')
-        return simple_combine_svgs(reduced_text_svg, reduced_traced_svg)
-
-def process_vtracer(image_base64):
-    """Process image using vtracer"""
-    try:
-        # Decode base64 image
-        image_data = base64.b64decode(image_base64)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        input_filename = f"vtracer_input_{timestamp}_{uuid.uuid4().hex[:8]}.png"
-        input_filepath = os.path.join(PARALLEL_OUTPUTS_DIR, input_filename)
-        
-        # Save input image
-        with open(input_filepath, "wb") as f:
-            f.write(image_data)
-            
-        # Configure vtracer
-        config = vtracer.Configuration()
-        config.corner_threshold = 60
-        config.length_threshold = 4.0
-        config.splice_threshold = 45
-        config.filter_speckle = 4
-        config.color_mode = "color"
-        config.hierarchical = True
-        config.mode = "polygon"
-        config.path_precision = 8
-        
-        # Process with vtracer
-        svg_output = vtracer.convert_image_to_svg_path(input_filepath, config)
-        
-        # Save SVG output
-        output_filename = f"vtracer_output_{timestamp}.svg"
-        output_filepath = os.path.join(PARALLEL_OUTPUTS_DIR, output_filename)
-        with open(output_filepath, "w") as f:
-            f.write(svg_output)
-            
-        return {
-            'success': True,
-            'svg': svg_output,
-            'path': output_filename
-        }
-        
-    except Exception as e:
-        logger.error(f"Vtracer processing error: {str(e)}")
-        return {
-            'success': False,
-            'error': str(e)
-        }
-
-def process_text_extraction(image_base64):
-    """Extract text from image using OCR"""
-    try:
-        # Decode and open image
-        image_data = base64.b64decode(image_base64)
-        image = Image.open(BytesIO(image_data))
-        
-        # Extract text
-        text = pytesseract.image_to_string(image)
-        
-        # Get text boxes
-        boxes = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)
-        
-        # Create SVG with text elements
-        width, height = image.size
-        svg_elements = ['<?xml version="1.0" encoding="UTF-8"?>']
-        svg_elements.append(f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">')
-        
-        for i in range(len(boxes['text'])):
-            if boxes['text'][i].strip():
-                x = boxes['left'][i]
-                y = boxes['top'][i] + boxes['height'][i]  # Adjust y for text baseline
-                svg_elements.append(f'  <text x="{x}" y="{y}" font-family="Arial" font-size="{boxes["height"][i]}px">{boxes["text"][i]}</text>')
-        
-        svg_elements.append('</svg>')
-        svg_output = '\n'.join(svg_elements)
-        
-        # Save output
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_filename = f"text_output_{timestamp}.svg"
-        output_filepath = os.path.join(PARALLEL_OUTPUTS_DIR, output_filename)
-        with open(output_filepath, "w") as f:
-            f.write(svg_output)
-            
-        return {
-            'success': True,
-            'text': text,
-            'svg': svg_output,
-            'path': output_filename
-        }
-        
-    except Exception as e:
-        logger.error(f"Text extraction error: {str(e)}")
-        return {
-            'success': False,
-            'error': str(e)
-        }
-
-def process_simple_conversion(image_base64):
-    """Simple PNG to SVG conversion"""
-    try:
-        # Decode and save image
-        image_data = base64.b64decode(image_base64)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        input_filename = f"simple_input_{timestamp}_{uuid.uuid4().hex[:8]}.png"
-        input_filepath = os.path.join(PARALLEL_OUTPUTS_DIR, input_filename)
-        
-        with open(input_filepath, "wb") as f:
-            f.write(image_data)
-            
-        # Convert using simple converter
-        output_filename = f"simple_output_{timestamp}.svg"
-        output_filepath = os.path.join(PARALLEL_OUTPUTS_DIR, output_filename)
-        
-        png_to_svg_converter.convert_png_to_svg(input_filepath, output_filepath)
-        
-        with open(output_filepath, "r") as f:
-            svg_output = f.read()
-            
-        return {
-            'success': True,
-            'svg': svg_output,
-            'path': output_filename
-        }
-        
-    except Exception as e:
-        logger.error(f"Simple conversion error: {str(e)}")
-        return {
-            'success': False,
-            'error': str(e)
-        }
-
-def process_text_svg_generation(image_base64, enhanced_prompt):
-    """Generate SVG from text elements using OCR and AI"""
-    try:
-        # Decode and save image
-        image_data = base64.b64decode(image_base64)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        input_filename = f"text_svg_input_{timestamp}_{uuid.uuid4().hex[:8]}.png"
-        input_filepath = os.path.join(PARALLEL_OUTPUTS_DIR, input_filename)
-        
-        with open(input_filepath, "wb") as f:
-            f.write(image_data)
-            
-        # Determine dimensions
-        img = Image.open(input_filepath)
-        width, height = img.size
-        view_box = f"0 0 {width} {height}"
-        
-        # Use OCR to extract text positions (if pytesseract is available)
-        try:
-            import pytesseract
-            ocr_data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
-            
-            # Filter out empty text and build text elements list
-            text_elements = []
-            for i in range(len(ocr_data['text'])):
-                text = ocr_data['text'][i].strip()
-                if text and int(ocr_data['conf'][i]) > 30:  # Confidence threshold
-                    text_elements.append({
-                        'text': text,
-                        'x': ocr_data['left'][i],
-                        'y': ocr_data['top'][i] + ocr_data['height'][i],  # Baseline adjustment
-                        'font_size': ocr_data['height'][i]
-                    })
-            
-            # Generate SVG using AI with OCR context
-            messages = [
-                {"role": "system", "content": (
-                    "You are a precise SVG code generator. "
-                    "Given image dimensions and extracted text elements with positions, "
-                    "create a clean SVG that reproduces the text layout accurately. "
-                    "Output only valid SVG code without explanations."
-                )},
-                {"role": "user", "content": (
-                    f"Create an SVG for an image {width}x{height}px with these text elements: {text_elements}. "
-                    f"Start with: <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}\" height=\"{height}\" viewBox=\"{view_box}\"> "
-                    "Then add <text> elements with appropriate positioning, font-family=\"sans-serif\", and colors. "
-                    "Close with </svg>. Return only the SVG code."
-                )}
-            ]
-            
-        except ImportError:
-            # Fallback without OCR
-            messages = [
-                {"role": "system", "content": (
-                    "You are a precise SVG code generator. "
-                    "Create a clean text-based SVG design based on the prompt. "
-                    "Output only valid SVG code without explanations."
-                )},
-                {"role": "user", "content": (
-                    f"Create a text-based SVG {width}x{height}px for: {enhanced_prompt}. "
-                    f"Start with: <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}\" height=\"{height}\" viewBox=\"{view_box}\"> "
-                    "Add appropriate text elements with good typography. Close with </svg>."
-                )}
-            ]
-        
-        # Generate SVG using OpenAI
-        response = chat_client.chat.completions.create(
-            model=CHAT_ASSISTANT_MODEL,
-            messages=messages,
-            temperature=0.7
+        output_svg_path = os.path.join(IMAGES_DIR, f"clean_{timestamp}_{uuid.uuid4().hex[:8]}.svg")
+        vtracer.convert_image_to_svg_py(
+            edited_png_path,
+            output_svg_path,
+            colormode='color',
+            hierarchical='stacked',
+            mode='spline',
+            filter_speckle=4,
+            color_precision=6,
+            layer_difference=16,
+            corner_threshold=60,
+            length_threshold=4.0,
+            max_iterations=10,
+            splice_threshold=45,
+            path_precision=3
         )
+
+        # Read the generated SVG
+        with open(output_svg_path, 'r', encoding='utf-8') as f:
+            svg_code = f.read()
+
+        return svg_code, os.path.basename(output_svg_path), edited_png_path
+    finally:
+        # Clean up temporary file
+        if os.path.exists(temp_input_path):
+            os.remove(temp_input_path)
+
+def ai_combine_svgs(text_svg_code, traced_svg_code):
+    """AI-powered combination of text and traced SVGs using OpenAI GPT-4.1-nano"""
+    logger.info("Using AI to intelligently combine SVGs...")
+    
+    url = OPENAI_CHAT_ENDPOINT
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {OPENAI_API_KEY_SVG}"
+    }
+
+    system_prompt = """You are an expert SVG designer and combiner. Your task is to intelligently combine two SVG files:
+1. A text-focused SVG (contains text elements extracted from an image)
+2. A traced/background SVG (contains the visual graphics without text)
+
+Your goal is to create a single, perfectly combined SVG that:
+- Maintains proper layering (background graphics behind, text on top)
+- Ensures optimal positioning and alignment
+- Preserves all visual elements from both SVGs
+- Uses appropriate opacity and blending for visual harmony
+- Creates a cohesive, professional design
+- Maintains proper SVG structure and dimensions (1080x1080)
+- Uses semantic grouping with descriptive IDs
+- Ensures text readability over background elements
+
+Guidelines:
+- Analyze both SVGs carefully before combining
+- Preserve the integrity of text elements (fonts, sizes, positions)
+- Maintain the visual appeal of background graphics
+- Use proper layering with <g> groups
+- Apply subtle opacity adjustments if needed for text readability
+- Ensure the combined result looks professional and cohesive
+- Return ONLY the final combined SVG code, no explanations"""
+
+    user_prompt = f"""Please combine these two SVGs intelligently:
+
+TEXT SVG (contains text elements):
+```svg
+{text_svg_code}
+```
+
+BACKGROUND/TRACED SVG (contains graphics/shapes):
+```svg
+{traced_svg_code}
+```
+
+Create a single, perfectly combined SVG that merges both elements beautifully."""
+
+    payload = {
+        "model": "gpt-4.1-nano",
+        "messages": [
+            {
+                "role": "system",
+                "content": system_prompt
+            },
+            {
+                "role": "user", 
+                "content": user_prompt
+            }
+        ],
+        "temperature": 0.3,
+        "max_tokens": 3000
+    }
+
+    try:
+        logger.info("Calling OpenAI for intelligent SVG combination...")
+        response = requests.post(url, headers=headers, json=payload)
+        response_data = response.json()
+
+        if response.status_code != 200:
+            logger.error(f"OpenAI API error for SVG combination: {response_data}")
+            # Fallback to simple combination
+            return simple_combine_svgs_fallback(text_svg_code, traced_svg_code)
+
+        ai_response = response_data["choices"][0]["message"]["content"]
         
-        svg_output = response.choices[0].message.content.strip()
+        # Extract SVG code from the response
+        svg_pattern = r'<svg.*?</svg>'
+        svg_match = re.search(svg_pattern, ai_response, re.DOTALL)
         
-        # Save SVG output
-        output_filename = f"text_svg_output_{timestamp}.svg"
-        output_filepath = os.path.join(PARALLEL_OUTPUTS_DIR, output_filename)
-        with open(output_filepath, "w") as f:
-            f.write(svg_output)
+        if svg_match:
+            combined_svg = svg_match.group(0)
+            logger.info("AI successfully combined SVGs")
+            return combined_svg
+        else:
+            logger.warning("Could not extract SVG from AI response, using fallback")
+            return simple_combine_svgs_fallback(text_svg_code, traced_svg_code)
             
-        return {
-            'success': True,
-            'svg': svg_output,
-            'path': output_filename,
-            'method': 'text_svg_ai'
-        }
-        
     except Exception as e:
-        logger.error(f"Text SVG generation error: {str(e)}")
-        return {
-            'success': False,
-            'error': str(e)
-        }
+        logger.error(f"Error in AI SVG combination: {str(e)}")
+        # Fallback to simple combination
+        return simple_combine_svgs_fallback(text_svg_code, traced_svg_code)
+
+def simple_combine_svgs_fallback(text_svg_code, traced_svg_code):
+    """Fallback simple combination method"""
+    try:
+        # Extract content from both SVGs
+        text_match = re.search(r'<svg[^>]*>(.*?)</svg>', text_svg_code, re.DOTALL)
+        traced_match = re.search(r'<svg[^>]*>(.*?)</svg>', traced_svg_code, re.DOTALL)
+        
+        if not text_match or not traced_match:
+            logger.warning("Could not extract SVG content, returning traced SVG")
+            return traced_svg_code
+        
+        text_content = text_match.group(1).strip()
+        traced_content = traced_match.group(1).strip()
+        
+        # Create combined SVG
+        combined_svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" width="1080" height="1080">
+  <g id="background-layer" opacity="0.9">
+    {traced_content}
+  </g>
+  <g id="text-layer">
+    {text_content}
+  </g>
+</svg>'''
+        
+        return combined_svg
+    except Exception as e:
+        logger.error(f"Error in fallback SVG combination: {str(e)}")
+        return traced_svg_code
 
 @app.route('/api/generate-parallel-svg', methods=['POST'])
-def handle_parallel_svg():
-    """Handle parallel SVG generation request"""
+def generate_parallel_svg():
+    """Pipeline: Stages 1-6 image gen, then parallel Stage 7: OCR+SVG and Clean SVG generation"""
     try:
-        result = generate_parallel_svg_pipeline(request.json)
-        return jsonify(result)
-    except Exception as e:
-        logger.error(f"Error in parallel SVG handler: {str(e)}")
-        logger.error(traceback.format_exc())
-        return jsonify({'error': str(e)}), 500
+        if not PARALLEL_FEATURES_AVAILABLE:
+            return jsonify({
+                "error": "Parallel SVG features not available",
+                "message": "Missing required dependencies (vtracer, remove_text_simple, etc.)",
+                "fallback": "Please use /api/generate-svg endpoint instead"
+            }), 501
 
-@app.route('/api/generate-text-svg', methods=['POST'])
-def generate_image_text_svg():
-    """Pipeline: Stages 1–6 image gen, then Stage 7: text OCR & SVG generation"""
-    try:
         data = request.json or {}
         user_input = data.get('prompt', '')
         skip_enhancement = data.get('skip_enhancement', False)
@@ -1645,17 +1509,7 @@ def generate_image_text_svg():
         if not user_input:
             return jsonify({'error': 'No prompt provided'}), 400
 
-        logger.info('=== IMAGE→TEXT→SVG PIPELINE START ===')
-
-        # Stage 1: Vector Suitability Check
-        logger.info('Stage 1: Vector Suitability Check')
-        vector_suitability = check_vector_suitability(user_input)
-        if vector_suitability.get('not_suitable', False):
-            return jsonify({
-                'error': 'Not suitable for SVG',
-                'guidance': vector_suitability.get('guidance'),
-                'stage': 1
-            }), 400
+        logger.info('=== PARALLEL SVG PIPELINE START ===')
 
         # Stage 2: Design Planning
         logger.info('Stage 2: Design Planning')
@@ -1668,258 +1522,132 @@ def generate_image_text_svg():
         # Prepare context for enhancements
         design_context = f"""Design Plan:\n{design_plan}\n\nDesign Knowledge and Best Practices:\n{design_knowledge}\n\nOriginal Request:\n{user_input}"""
 
-        # Stage 4 & 5: Prompt Enhancements
-        if skip_enhancement:
-            enhanced_prompt = user_input
-        else:
-            logger.info('Stage 4: Pre-Enhancement')
-            pre = pre_enhance_prompt(design_context)
-            logger.info('Stage 5: Technical Enhancement')
-            enhanced_prompt = enhance_prompt_with_chat(pre)
+        # Stage 4: Pre-Enhancement Phase
+        logger.info('Stage 4: Pre-Enhancement Phase')
+        logger.info('Pre-enhancing prompt with design context...')
+        logger.info(f'Using model: {PRE_ENHANCER_MODEL}')
+        pre_enhanced_prompt = pre_enhance_prompt(design_context)
+        logger.info('Pre-enhanced prompt generated')
 
-        # Stage 6: Image Generation via GPT-Image
-        logger.info('Stage 6: Image Generation via GPT-Image')
-        image_base64, image_filename = generate_image_with_gpt(enhanced_prompt, design_context)
+        # Stage 5: Final Enhancement Phase
+        logger.info('Stage 5: Final Enhancement Phase')
+        logger.info('Enhancing prompt with technical specifications...')
+        logger.info(f'Using model: {PROMPT_ENHANCER_MODEL}')
+        enhanced_prompt = enhance_prompt_with_chat(pre_enhanced_prompt)
+        logger.info('Enhanced prompt generated')
 
-        # Stage 7: OCR and SVG generation via GPT-4o-mini
-        logger.info('Stage 7: OCR and SVG Generation via GPT-4o-mini')
-        
-        # Decode and save the image to disk
+        # Build advanced image prompt optimized for parallel SVG processing
+        image_prompt = build_advanced_image_prompt(enhanced_prompt, design_context)
+
+        # Stage 6: Image Generation via GPT-Image using enhanced prompt
+        logger.info('Stage 6: Image Generation via GPT-Image with enhanced prompt')
+        logger.debug(f'Image prompt: {image_prompt[:200]}...')
+        image_base64, image_filename = generate_image_with_gpt(image_prompt, design_context)
         image_data = base64.b64decode(image_base64)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        input_filename = f"text_input_{timestamp}_{uuid.uuid4().hex[:8]}.png"
-        input_filepath = os.path.join(IMAGES_DIR, input_filename)
-        with open(input_filepath, "wb") as f:
-            f.write(image_data)
-        
-        # Determine dimensions
-        img = Image.open(input_filepath)
-        width, height = img.size
-        view_box = f"0 0 {width} {height}"
-        image_url = f"/static/images/{input_filename}"
-        
-        # Prepare prompt for SVG generation
-        messages = [
-            {"role": "system", "content": (
-                "You are a precise SVG code generator. "
-                "Given image dimensions and a list of text elements with their positions (x, y), font sizes, and fill colors, "
-                "output only a valid SVG string with the correct <svg> wrapper and one <text> tag per element, "
-                "using each 'text' value exactly as provided (no changes). Do not include explanations or markup extras."
-            )},
-            {"role": "user", "content": (
-                f"Here is an image at URL: {image_url}. The image width is {width}px and height is {height}px. "
-                "Generate a valid SVG that begins with:\n"
-                f"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}\" height=\"{height}\" viewBox=\"{view_box}\">\n"
-                "Then include one <text> element per visible text string, each with appropriate x, y coordinates, "
-                "font-family=\"sans-serif\", font-size matching the original, and fill color in hex. Close the SVG at the end. "
-                "Return only the complete SVG code."
-            )}
-        ]
-        
-        response = chat_client.chat.completions.create(
-            model=CHAT_ASSISTANT_MODEL,
-            messages=messages,
-            temperature=0.7
-        )
-        
-        svg_code = response.choices[0].message.content.strip()
-        
-        # Save and return
-        svg_filename = save_svg(svg_code, prefix='text_svg')
-        
+
+        # Stage 7: Parallel Processing
+        logger.info('Stage 7: Parallel Processing - OCR+SVG and Clean SVG')
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            # Submit both tasks
+            ocr_future = executor.submit(process_ocr_svg, image_data)
+            clean_future = executor.submit(process_clean_svg, image_data)
+            
+            # Get results
+            text_svg_code, text_svg_path = ocr_future.result()
+            clean_svg_code, clean_svg_path, edited_png_path = clean_future.result()
+
+        # Stage 8: AI-Powered SVG Combination
+        logger.info('Stage 8: AI-Powered SVG Combination using GPT-4.1-nano')
+        combined_svg_code = ai_combine_svgs(text_svg_code, clean_svg_code)
+        combined_svg_filename = f"combined_svg_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}.svg"
+        combined_svg_path = os.path.join(IMAGES_DIR, combined_svg_filename)
+        with open(combined_svg_path, 'w') as f:
+            f.write(combined_svg_code)
+
+        # Create a session subfolder and move outputs there
+        session_folder = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+        output_folder = os.path.join(PARALLEL_OUTPUTS_DIR, session_folder)
+        os.makedirs(output_folder, exist_ok=True)
+
+        # Base URL for parallel outputs
+        base_url = '/static/images/parallel'
+
+        # Move files to session folder
+        try:
+            # Move generated image
+            src_image = os.path.join(IMAGES_DIR, image_filename)
+            dst_image = os.path.join(output_folder, image_filename)
+            if os.path.exists(src_image):
+                os.rename(src_image, dst_image)
+
+            # Move text SVG
+            src_text_svg = os.path.join(IMAGES_DIR, text_svg_path)
+            dst_text_svg = os.path.join(output_folder, text_svg_path)
+            if os.path.exists(src_text_svg):
+                os.rename(src_text_svg, dst_text_svg)
+
+            # Move cleaned SVG
+            src_clean_svg = os.path.join(IMAGES_DIR, clean_svg_path) if not os.path.isabs(clean_svg_path) else clean_svg_path
+            dst_clean_svg = os.path.join(output_folder, os.path.basename(clean_svg_path))
+            if os.path.exists(src_clean_svg):
+                os.rename(src_clean_svg, dst_clean_svg)
+
+            # Move combined SVG
+            dst_combined_svg = os.path.join(output_folder, combined_svg_filename)
+            if os.path.exists(combined_svg_path):
+                os.rename(combined_svg_path, dst_combined_svg)
+
+            # Move cleaned PNG
+            dst_edited_png = os.path.join(output_folder, os.path.basename(edited_png_path))
+            if os.path.exists(edited_png_path):
+                os.rename(edited_png_path, dst_edited_png)
+
+        except Exception as e:
+            logger.warning(f"Error moving files to session folder: {e}")
+
+        # Construct URLs for client access
+        image_url = f"{base_url}/{session_folder}/{image_filename}"
+        text_svg_url = f"{base_url}/{session_folder}/{text_svg_path}"
+        clean_svg_url = f"{base_url}/{session_folder}/{os.path.basename(clean_svg_path)}"
+        combined_svg_url = f"{base_url}/{session_folder}/{combined_svg_filename}"
+        edited_png_url = f"{base_url}/{session_folder}/{os.path.basename(edited_png_path)}"
+
         return jsonify({
             'original_prompt': user_input,
-            'enhanced_prompt': enhanced_prompt,
-            'image_base64': image_base64,
-            'image_url': f'/static/images/{image_filename}',
-            'svg_code': svg_code,
-            'svg_path': svg_filename,
-            'stage': 7,
-            'pipeline_type': 'text_svg',
-            'stages': {
-                'vector_suitability': {'completed': True, 'suitable': True},
-                'design_plan': {'completed': True, 'content': design_plan},
-                'design_knowledge': {'completed': True, 'content': design_knowledge},
-                'pre_enhancement': {'completed': not skip_enhancement, 'skipped': skip_enhancement},
-                'prompt_enhancement': {'completed': not skip_enhancement, 'skipped': skip_enhancement},
-                'image_generation': {'completed': True, 'image_url': f'/static/images/{image_filename}'},
-                'text_svg_generation': {'completed': True, 'svg_path': svg_filename}
-            }
+            'image_url': image_url,
+            'edited_png': {
+                'path': f"parallel/{session_folder}/{os.path.basename(edited_png_path)}",
+                'url': edited_png_url
+            },
+            'text_svg': {
+                'code': text_svg_code,
+                'path': f"parallel/{session_folder}/{text_svg_path}"
+            },
+            'clean_svg': {
+                'code': clean_svg_code,
+                'path': f"parallel/{session_folder}/{os.path.basename(clean_svg_path)}"
+            },
+            'combined_svg': {
+                'code': combined_svg_code,
+                'path': f"parallel/{session_folder}/{combined_svg_filename}",
+                'url': combined_svg_url
+            },
+            'stage': 8
         })
-        
-    except Exception as e:
-        logger.error(f"Error in text SVG pipeline: {str(e)}")
-        logger.error(traceback.format_exc())
-        return jsonify({'error': str(e), 'stage': 'error'}), 500
-
-@app.route('/api/generate-combined-svg', methods=['POST'])
-def generate_combined_svg():
-    """Full parallel pipeline: Stages 1-6 + Stage 7: Text SVG + Stage 8: Traced SVG + Stage 9: Combine SVGs"""
-    try:
-        data = request.json or {}
-        user_input = data.get('prompt', '')
-        skip_enhancement = data.get('skip_enhancement', False)
-
-        if not user_input:
-            return jsonify({'error': 'No prompt provided'}), 400
-
-        logger.info('=== COMBINED SVG PIPELINE START ===')
-        logger.info(f'Processing prompt: {user_input[:100]}...')
-
-        # Stages 1-5: Same as other pipelines
-        logger.info('Stage 1: Vector Suitability Check')
-        vector_suitability = check_vector_suitability(user_input)
-        if vector_suitability.get('not_suitable', False):
-            return jsonify({
-                'error': 'Not suitable for SVG',
-                'guidance': vector_suitability.get('guidance'),
-                'stage': 1
-            }), 400
-
-        # Stage 2: Design Planning
-        logger.info('Stage 2: Design Planning')
-        design_plan = plan_design(user_input)
-
-        # Stage 3: Design Knowledge Generation
-        logger.info('Stage 3: Design Knowledge Generation')
-        design_knowledge = generate_design_knowledge(design_plan, user_input)
-
-        # Prepare context for enhancements
-        design_context = f"""Design Plan:\n{design_plan}\n\nDesign Knowledge and Best Practices:\n{design_knowledge}\n\nOriginal Request:\n{user_input}"""
-
-        # Stage 4 & 5: Prompt Enhancements
-        if skip_enhancement:
-            enhanced_prompt = user_input
-            pre_enhanced_prompt = user_input
-        else:
-            logger.info('Stage 4: Pre-Enhancement')
-            pre_enhanced_prompt = pre_enhance_prompt(design_context)
-            logger.info('Stage 5: Technical Enhancement')
-            enhanced_prompt = enhance_prompt_with_chat(pre_enhanced_prompt)
-
-        # Stage 6: Image Generation via GPT-Image
-        logger.info('Stage 6: Image Generation')
-        image_base64, image_filename = generate_image_with_gpt(enhanced_prompt, design_context)
-        
-        # Decode image for processing
-        image_data = base64.b64decode(image_base64)
-
-        # Stage 7: Text SVG Generation using OCR + AI
-        logger.info('Stage 7: Text SVG Generation (OCR + AI)')
-        try:
-            text_svg_code, text_svg_filename = process_ocr_svg(image_data)
-            logger.info(f'Text SVG generated: {text_svg_filename}')
-        except Exception as e:
-            logger.error(f'Text SVG generation failed: {str(e)}')
-            text_svg_code = '<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080"></svg>'
-            text_svg_filename = 'fallback_text.svg'
-
-        # Stage 8: Traced SVG Generation (Clean background)
-        logger.info('Stage 8: Traced SVG Generation (Clean Background)')
-        try:
-            if vtracer_available:
-                traced_svg_code, traced_svg_path, edited_png_path = process_clean_svg(image_data)
-                logger.info(f'Traced SVG generated: {traced_svg_path}')
-            else:
-                # Fallback: Use simple converter on original image
-                logger.info('vtracer not available, using simple conversion')
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                temp_input_path = os.path.join(PARALLEL_OUTPUTS_DIR, f"simple_input_{timestamp}_{uuid.uuid4().hex[:8]}.png")
-                with open(temp_input_path, "wb") as f:
-                    f.write(image_data)
-                
-                traced_svg_path = os.path.join(PARALLEL_OUTPUTS_DIR, f"simple_traced_{timestamp}.svg")
-                png_to_svg_converter.convert_png_to_svg(temp_input_path, traced_svg_path)
-                
-                with open(traced_svg_path, 'r') as f:
-                    traced_svg_code = f.read()
-                
-                os.remove(temp_input_path)
-                edited_png_path = None
-                
-        except Exception as e:
-            logger.error(f'Traced SVG generation failed: {str(e)}')
-            traced_svg_code = '<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080"></svg>'
-            traced_svg_path = 'fallback_traced.svg'
-            edited_png_path = None
-
-        # Stage 9: Combine Text SVG + Traced SVG
-        logger.info('Stage 9: Combining Text SVG + Traced SVG')
-        try:
-            combined_svg_code = combine_svgs(text_svg_code, traced_svg_code)
-            logger.info('SVG combination completed successfully')
-        except Exception as e:
-            logger.error(f'SVG combination failed: {str(e)}')
-            logger.info('Using simple combination fallback')
-            combined_svg_code = simple_combine_svgs(text_svg_code, traced_svg_code)
-
-        # Save the final combined SVG
-        combined_svg_filename = save_svg(combined_svg_code, prefix='combined_svg')
-        logger.info(f'Final combined SVG saved: {combined_svg_filename}')
-
-        # Prepare response with all outputs
-        response_data = {
-            'original_prompt': user_input,
-            'pre_enhanced_prompt': pre_enhanced_prompt,
-            'enhanced_prompt': enhanced_prompt,
-            'image_base64': image_base64,
-            'image_url': f'/static/images/{image_filename}',
-            'text_svg_code': text_svg_code,
-            'text_svg_path': text_svg_filename,
-            'traced_svg_code': traced_svg_code,
-            'traced_svg_path': traced_svg_path,
-            'combined_svg_code': combined_svg_code,
-            'combined_svg_path': combined_svg_filename,
-            'edited_png_path': edited_png_path,
-            'pipeline_type': 'combined_svg',
-            'stage': 9,
-            'stages': {
-                'vector_suitability': {'completed': True, 'suitable': True},
-                'design_plan': {'completed': True, 'content': design_plan},
-                'design_knowledge': {'completed': True, 'content': design_knowledge},
-                'pre_enhancement': {'completed': not skip_enhancement, 'skipped': skip_enhancement, 'content': pre_enhanced_prompt},
-                'prompt_enhancement': {'completed': not skip_enhancement, 'skipped': skip_enhancement, 'content': enhanced_prompt},
-                'image_generation': {'completed': True, 'image_url': f'/static/images/{image_filename}'},
-                'text_svg_generation': {'completed': True, 'svg_path': text_svg_filename},
-                'traced_svg_generation': {'completed': True, 'svg_path': traced_svg_path},
-                'svg_combination': {'completed': True, 'svg_path': combined_svg_filename}
-            }
-        }
-
-        logger.info('=== COMBINED SVG PIPELINE COMPLETE ===')
-        return jsonify(response_data)
 
     except Exception as e:
-        logger.error(f"Error in combined SVG pipeline: {str(e)}")
-        logger.error(traceback.format_exc())
-        return jsonify({'error': str(e), 'stage': 'failed'}), 500
-
-@app.route('/health')
-def health_check():
-    """Health check endpoint"""
-    return jsonify({'status': 'healthy'}), 200
-
-# Import route modules to register them (do this after app is created)
-try:
-    from image_to_text_svg_pipeline import create_text_svg_route
-    create_text_svg_route(app)
-    logger.info("Successfully registered image_to_text_svg_pipeline routes")
-except Exception as e:
-    logger.error(f"Failed to register image_to_text_svg_pipeline routes: {str(e)}")
+        logger.error(f"Error in generate_parallel_svg: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    try:
-        # Get port from environment variable for deployment
-        port = int(os.environ.get('PORT', 5000))
-        # Use 0.0.0.0 when PORT env var is set (deployment)
-        host = '0.0.0.0' if 'PORT' in os.environ else '127.0.0.1'
-        
-        logger.info(f"Starting Flask app on {host}:{port}")
-        logger.info(f"Static directory: {STATIC_DIR}")
-        logger.info(f"Images directory: {IMAGES_DIR}")
-        
-        app.run(host=host, port=port)
-    except Exception as e:
-        logger.error(f"Failed to start Flask app: {str(e)}")
-        logger.error(traceback.format_exc())
-        sys.exit(1)
+    # Get port from environment variable (Render sets PORT=8000)
+    port = int(os.getenv('PORT', 5000))
+    
+    # Use 0.0.0.0 for production (Render) and 127.0.0.1 for local development
+    host = '0.0.0.0' if os.getenv('PORT') else '127.0.0.1'
+    
+    # Disable debug mode in production
+    debug = not bool(os.getenv('PORT'))
+    
+    logger.info(f"Starting Flask application on {host}:{port} (debug={debug})")
+    app.run(host=host, port=port, debug=debug)
