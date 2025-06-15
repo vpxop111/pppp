@@ -276,7 +276,7 @@ def generate_image_with_gpt(enhanced_prompt, design_context=None):
             model=GPT_IMAGE_MODEL,
             prompt=optimized_prompt,
             size="1024x1024",
-            quality="low"   # Changed from "low" to "standard" for better quality
+            quality="standard"   # Using standard quality as supported by OpenAI API
         )
 
         # Get base64 image data from the response

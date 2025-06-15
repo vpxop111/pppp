@@ -26,7 +26,7 @@ def remove_text(input_image_path):
             prompt=prompt,
             image=open(input_image_path, "rb"),
             size="1024x1024",
-            quality="low"
+            quality="standard"
         )
         
         # Get the base64 image from response
