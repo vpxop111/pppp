@@ -797,40 +797,115 @@ def chat_assistant():
                 image_base64, image_filename = generate_image_with_gpt(enhanced_prompt, design_context)
                 logger.info(f"Image generated and saved as: {image_filename}")
                 
-                # Stage 6: SVG Generation
-                logger.info("\n[STAGE 6: SVG Generation]")
+                # Stage 6: SVG Generation (Basic)
+                logger.info("\n[STAGE 6: SVG Generation (Basic)]")
                 logger.info("-"*50)
                 logger.info("Converting design to SVG format...")
                 logger.info(f"Using model: {SVG_GENERATOR_MODEL}")
-                svg_code = generate_svg_from_image(image_base64, enhanced_prompt)
-                svg_filename = save_svg(svg_code, prefix="assistant_svg")
-                logger.info(f"SVG generated and saved as: {svg_filename}")
+                basic_svg_code = generate_svg_from_image(image_base64, enhanced_prompt)
+                basic_svg_filename = save_svg(basic_svg_code, prefix="basic_svg")
+                logger.info(f"Basic SVG generated and saved as: {basic_svg_filename}")
                 
-                # Stage 7: Design Explanation
-                logger.info("\n[STAGE 7: Design Explanation]")
+                # Decode image for parallel processing
+                image_data = base64.b64decode(image_base64)
+
+                # Stage 7: Text SVG Generation using OCR + AI
+                logger.info("\n[STAGE 7: Text SVG Generation (OCR + AI)]")
+                logger.info("-"*50)
+                try:
+                    text_svg_code, text_svg_filename = process_ocr_svg(image_data)
+                    logger.info(f"Text SVG generated: {text_svg_filename}")
+                except Exception as e:
+                    logger.error(f"Text SVG generation failed: {str(e)}")
+                    text_svg_code = '<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080"></svg>'
+                    text_svg_filename = 'fallback_text.svg'
+
+                # Stage 8: Traced SVG Generation (Clean background)
+                logger.info("\n[STAGE 8: Traced SVG Generation (Clean Background)]")
+                logger.info("-"*50)
+                try:
+                    if vtracer_available:
+                        traced_svg_code, traced_svg_path, edited_png_path = process_clean_svg(image_data)
+                        logger.info(f"Traced SVG generated: {traced_svg_path}")
+                    else:
+                        # Fallback: Use simple converter on original image
+                        logger.info("vtracer not available, using simple conversion")
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        temp_input_path = os.path.join(PARALLEL_OUTPUTS_DIR, f"simple_input_{timestamp}_{uuid.uuid4().hex[:8]}.png")
+                        with open(temp_input_path, "wb") as f:
+                            f.write(image_data)
+                        
+                        traced_svg_path = os.path.join(PARALLEL_OUTPUTS_DIR, f"simple_traced_{timestamp}.svg")
+                        png_to_svg_converter.convert_png_to_svg(temp_input_path, traced_svg_path)
+                        
+                        with open(traced_svg_path, 'r') as f:
+                            traced_svg_code = f.read()
+                        
+                        os.remove(temp_input_path)
+                        edited_png_path = None
+                        
+                except Exception as e:
+                    logger.error(f"Traced SVG generation failed: {str(e)}")
+                    traced_svg_code = '<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080"></svg>'
+                    traced_svg_path = 'fallback_traced.svg'
+                    edited_png_path = None
+
+                # Stage 9: Combine Text SVG + Traced SVG
+                logger.info("\n[STAGE 9: Combining Text SVG + Traced SVG]")
+                logger.info("-"*50)
+                try:
+                    combined_svg_code = combine_svgs(text_svg_code, traced_svg_code)
+                    logger.info("SVG combination completed successfully")
+                except Exception as e:
+                    logger.error(f"SVG combination failed: {str(e)}")
+                    logger.info("Using simple combination fallback")
+                    combined_svg_code = simple_combine_svgs(text_svg_code, traced_svg_code)
+
+                # Save the final combined SVG
+                combined_svg_filename = save_svg(combined_svg_code, prefix='combined_svg')
+                logger.info(f"Final combined SVG saved: {combined_svg_filename}")
+                
+                # Stage 10: Design Explanation
+                logger.info("\n[STAGE 10: Design Explanation]")
                 logger.info("-"*50)
                 logger.info("Generating design explanation...")
                 logger.info(f"Using model: {CHAT_ASSISTANT_MODEL}")
                 
-                explanation_prompt = f"I've created a design for the user. Here's the SVG code:\n\n```svg\n{svg_code}\n```\n\nPlease explain this design to the user in a friendly, conversational way. Describe the elements, colors, layout, and how it addresses their request."
+                # Use a simple explanation without passing SVG content to avoid token limits
+                explanation_prompt = "I've created a comprehensive design with multiple SVG versions. Briefly explain this design to the user in a friendly way, mentioning that they have: 1) Original image, 2) Basic SVG, 3) Text-only SVG, 4) Background-only SVG, and 5) Combined SVG. Keep it under 200 words."
                 
-                temp_messages = messages + [{"role": "user", "content": explanation_prompt}]
-                ai_explanation = chat_with_ai_about_design(temp_messages, svg_code)
+                try:
+                    # Use a simple message without the SVG content to avoid token limits
+                    temp_messages = [{"role": "user", "content": explanation_prompt}]
+                    ai_explanation = chat_with_ai_about_design(temp_messages, None)  # Pass None for SVG to avoid token limit
+                except Exception as e:
+                    logger.error(f"Explanation generation failed: {str(e)}")
+                    ai_explanation = "I've created your design with multiple versions! You now have a complete set including the original image, basic SVG, text-only SVG, background-only SVG, and a combined version that merges text and background elements perfectly."
                 
                 logger.info("\nExplanation Generated:")
-                for line in ai_explanation.split('\n')[:5]:
+                for line in ai_explanation.split('\n')[:3]:
                     logger.info(f"  {line}")
                 logger.info("  ...")
                 
-                # Create comprehensive response
-                full_response = f"{ai_explanation}\n\n```svg\n{svg_code}\n```\n\nFeel free to ask me to modify any aspect of this design!"
+                # Create comprehensive response with all versions
+                full_response = f"{ai_explanation}\n\n**Final Combined SVG:**\n```svg\n{combined_svg_code}\n```\n\nFeel free to ask me to modify any aspect of this design!"
                 
                 messages.append({"role": "assistant", "content": full_response})
                 
                 response_data = {
                     "response": full_response,
-                    "svg_code": svg_code,
-                    "svg_path": svg_filename,
+                    "svg_code": combined_svg_code,
+                    "svg_path": combined_svg_filename,
+                    "basic_svg_code": basic_svg_code,
+                    "basic_svg_path": basic_svg_filename,
+                    "text_svg_code": text_svg_code,
+                    "text_svg_path": text_svg_filename,
+                    "traced_svg_code": traced_svg_code,
+                    "traced_svg_path": traced_svg_path,
+                    "image_base64": image_base64,
+                    "image_url": f"/static/images/{image_filename}",
+                    "edited_png_path": edited_png_path,
+                    "pipeline_type": "full_parallel_chat",
                     "messages": messages
                 }
                 
@@ -841,7 +916,10 @@ def chat_assistant():
                 logger.info(f"- Design knowledge gathered")
                 logger.info(f"- Prompt enhanced and refined")
                 logger.info(f"- Image generated: {image_filename}")
-                logger.info(f"- SVG created: {svg_filename}")
+                logger.info(f"- Basic SVG created: {basic_svg_filename}")
+                logger.info(f"- Text SVG created: {text_svg_filename}")
+                logger.info(f"- Traced SVG created: {traced_svg_path}")
+                logger.info(f"- Combined SVG created: {combined_svg_filename}")
                 logger.info(f"- Explanation provided")
                 logger.info("="*80)
                 
