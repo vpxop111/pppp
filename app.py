@@ -43,7 +43,6 @@ from shared_functions import (
     enhance_prompt_with_chat
 )
 from parallel_svg_pipeline import generate_parallel_svg_pipeline, init_parallel_pipeline
-from image_to_text_svg_pipeline import generate_image_text_svg
 
 # Load environment variables
 load_dotenv()
@@ -1051,6 +1050,14 @@ def handle_parallel_svg():
 def health_check():
     """Health check endpoint"""
     return jsonify({'status': 'healthy'}), 200
+
+# Import route modules to register them (do this after app is created)
+try:
+    from image_to_text_svg_pipeline import create_text_svg_route
+    create_text_svg_route(app)
+    logger.info("Successfully registered image_to_text_svg_pipeline routes")
+except Exception as e:
+    logger.error(f"Failed to register image_to_text_svg_pipeline routes: {str(e)}")
 
 if __name__ == '__main__':
     try:
