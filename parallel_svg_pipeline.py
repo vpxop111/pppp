@@ -1,4 +1,3 @@
-
 from concurrent.futures import ThreadPoolExecutor
 import base64
 from io import BytesIO
@@ -43,21 +42,36 @@ def init_parallel_pipeline():
     """Initialize the parallel SVG pipeline"""
     try:
         logger.info("Initializing parallel SVG pipeline")
-        # Verify vtracer is available
-        if not hasattr(vtracer, 'convert_image_to_svg_path'):
-            raise ImportError("vtracer module is missing required function")
+        
+        # Try to verify vtracer is available, but don't fail if it's not
+        vtracer_available = False
+        try:
+            import vtracer
+            if hasattr(vtracer, 'convert_image_to_svg_path') or hasattr(vtracer, 'convert_image_to_svg_py'):
+                vtracer_available = True
+                logger.info("vtracer module found and verified")
+            else:
+                logger.warning("vtracer module found but missing expected functions")
+        except ImportError:
+            logger.warning("vtracer module not available - parallel SVG features will be limited")
         
         # Verify directories exist
         if not os.path.exists(PARALLEL_OUTPUTS_DIR):
             os.makedirs(PARALLEL_OUTPUTS_DIR, exist_ok=True)
             logger.info(f"Created PARALLEL_OUTPUTS_DIR: {PARALLEL_OUTPUTS_DIR}")
         
-        logger.info("Parallel SVG pipeline initialized successfully")
-        return True
+        if vtracer_available:
+            logger.info("Parallel SVG pipeline initialized successfully with vtracer support")
+        else:
+            logger.info("Parallel SVG pipeline initialized with limited functionality (no vtracer)")
+        
+        return vtracer_available
     except Exception as e:
         logger.error(f"Failed to initialize parallel SVG pipeline: {str(e)}")
         logger.error(traceback.format_exc())
-        raise
+        # Don't raise the exception - allow the app to continue without parallel pipeline
+        logger.warning("Continuing without parallel SVG pipeline support")
+        return False
 
 # Instantiate a GPT client for chat completions
 chat_client = OpenAI()
@@ -539,6 +553,92 @@ def generate_parallel_svg_pipeline(data):
         logger.info('=== PARALLEL SVG PIPELINE START ===')
         logger.info(f'Processing prompt: {user_input[:100]}...')
 
+        # Check if vtracer is available
+        vtracer_available = False
+        try:
+            import vtracer
+            if hasattr(vtracer, 'convert_image_to_svg_path') or hasattr(vtracer, 'Config'):
+                vtracer_available = True
+        except ImportError:
+            pass
+        
+        if not vtracer_available:
+            logger.warning('vtracer not available - falling back to standard SVG generation')
+            # Fallback to the standard generation method from shared_functions
+            from shared_functions import (
+                check_vector_suitability,
+                plan_design,
+                generate_design_knowledge,
+                pre_enhance_prompt,
+                enhance_prompt_with_chat
+            )
+            
+            # Stage 1: Vector Suitability Check
+            vector_suitability = check_vector_suitability(user_input)
+            if vector_suitability.get('not_suitable', False):
+                return {
+                    'error': 'Not suitable for SVG',
+                    'guidance': vector_suitability.get('guidance'),
+                    'stage': 'vector_check'
+                }
+            
+            # Stages 2-5: Design planning and enhancement
+            design_plan = plan_design(user_input)
+            design_knowledge = generate_design_knowledge(design_plan, user_input)
+            design_context = f"""Design Plan:\n{design_plan}\n\nDesign Knowledge:\n{design_knowledge}\n\nOriginal Request:\n{user_input}"""
+            
+            if not skip_enhancement:
+                pre_enhanced = pre_enhance_prompt(design_context)
+                enhanced_prompt = enhance_prompt_with_chat(pre_enhanced)
+            else:
+                enhanced_prompt = user_input
+            
+            # Stage 6: Generate image using GPT
+            image_base64, image_filename = generate_image_with_gpt(enhanced_prompt)
+            
+            # Stage 7: Use a simple PNG to SVG converter as fallback
+            try:
+                import png_to_svg_converter
+                image_data = base64.b64decode(image_base64)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                input_filename = f"fallback_input_{timestamp}_{uuid.uuid4().hex[:8]}.png"
+                input_filepath = os.path.join(PARALLEL_OUTPUTS_DIR, input_filename)
+                
+                with open(input_filepath, "wb") as f:
+                    f.write(image_data)
+                
+                output_filepath = os.path.join(PARALLEL_OUTPUTS_DIR, f"fallback_output_{timestamp}.svg")
+                png_to_svg_converter.convert_png_to_svg(input_filepath, output_filepath)
+                
+                with open(output_filepath, 'r') as f:
+                    svg_code = f.read()
+                
+                svg_filename = save_svg(svg_code, prefix='fallback_svg')
+                
+                return {
+                    'original_prompt': user_input,
+                    'image_url': f'/static/images/{image_filename}',
+                    'svg_code': svg_code,
+                    'svg_path': svg_filename,
+                    'stage': 'fallback_complete',
+                    'note': 'Generated using fallback method (vtracer not available)'
+                }
+                
+            except Exception as fallback_error:
+                logger.error(f"Fallback SVG generation failed: {str(fallback_error)}")
+                # Return just the image if SVG conversion fails
+                return {
+                    'original_prompt': user_input,
+                    'image_url': f'/static/images/{image_filename}',
+                    'svg_code': None,
+                    'svg_path': None,
+                    'stage': 'image_only',
+                    'note': 'SVG conversion unavailable - image generated successfully'
+                }
+
+        # Original vtracer-based processing
+        logger.info('Using vtracer for SVG conversion')
+        
         # Generate image using GPT
         image_base64, image_filename = generate_image_with_gpt(user_input)
         logger.info(f'Image generated: {image_filename}')

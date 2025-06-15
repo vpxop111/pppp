@@ -58,11 +58,16 @@ logger = logging.getLogger(__name__)
 
 try:
     # Initialize parallel pipeline
-    init_parallel_pipeline()
+    vtracer_available = init_parallel_pipeline()
+    if vtracer_available:
+        logger.info("Parallel SVG pipeline ready with full vtracer support")
+    else:
+        logger.info("Parallel SVG pipeline initialized with limited functionality")
 except Exception as e:
     logger.error(f"Failed to initialize parallel pipeline: {str(e)}")
     logger.error(traceback.format_exc())
-    sys.exit(1)
+    logger.warning("Continuing without parallel pipeline support")
+    vtracer_available = False
 
 app = Flask(__name__)
 
