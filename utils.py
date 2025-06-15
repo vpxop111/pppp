@@ -123,8 +123,8 @@ def generate_image_with_gpt(enhanced_prompt, design_context=None):
             model=GPT_IMAGE_MODEL,
             prompt=optimized_prompt,
             size="1024x1024",
-            quality="standard",
-            response_format="b64_json"  # Explicitly request base64 format
+            quality="medium"   # Using medium quality - gpt-image-1 supports: low, medium, high, auto
+            # Note: response_format parameter is not supported by gpt-image-1 (always returns b64_json)
         )
 
         # Get base64 image data from the response
