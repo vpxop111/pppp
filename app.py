@@ -22,18 +22,11 @@ import numpy as np
 import remove_text_simple
 import png_to_svg_converter
 from utils import (
-    logger,
     STATIC_DIR,
     IMAGES_DIR,
     save_image,
     save_svg,
-    generate_image_with_gpt,
-    OPENAI_CHAT_ENDPOINT,
-    OPENAI_API_KEY_ENHANCER,
-    OPENAI_API_KEY_SVG,
-    GPT_IMAGE_MODEL,
-    SVG_GENERATOR_MODEL,
-    CHAT_ASSISTANT_MODEL
+    generate_image_with_gpt
 )
 from shared_functions import (
     check_vector_suitability,
@@ -55,6 +48,21 @@ logging.basicConfig(
     stream=sys.stdout  # Ensure logs go to stdout for Render
 )
 logger = logging.getLogger(__name__)
+
+# API configuration
+OPENAI_API_KEY_ENHANCER = os.getenv('OPENAI_API_KEY_ENHANCER')
+OPENAI_API_KEY_SVG = os.getenv('OPENAI_API_KEY_SVG')
+OPENAI_API_BASE = "https://api.openai.com/v1"
+OPENAI_CHAT_ENDPOINT = f"{OPENAI_API_BASE}/chat/completions"
+
+# Model names (using standard OpenAI models that are widely available)
+PLANNER_MODEL = "gpt-4o-mini"
+DESIGN_KNOWLEDGE_MODEL = "gpt-4o-mini"
+PRE_ENHANCER_MODEL = "gpt-4o-mini"
+PROMPT_ENHANCER_MODEL = "gpt-4o-mini"
+GPT_IMAGE_MODEL = "dall-e-3"
+SVG_GENERATOR_MODEL = "gpt-4o-mini"
+CHAT_ASSISTANT_MODEL = "gpt-4o-mini"
 
 try:
     # Initialize parallel pipeline
@@ -105,10 +113,6 @@ os.makedirs(IMAGES_DIR, exist_ok=True)
 # Directory for parallel pipeline outputs
 PARALLEL_OUTPUTS_DIR = os.path.join(IMAGES_DIR, 'parallel')
 os.makedirs(PARALLEL_OUTPUTS_DIR, exist_ok=True)
-
-# API keys
-OPENAI_API_KEY_ENHANCER = os.getenv('OPENAI_API_KEY_ENHANCER')
-OPENAI_API_KEY_SVG = os.getenv('OPENAI_API_KEY_SVG')
 
 if not OPENAI_API_KEY_ENHANCER or not OPENAI_API_KEY_SVG:
     raise ValueError("OpenAI API keys must be set in environment variables")

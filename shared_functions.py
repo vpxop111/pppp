@@ -1,15 +1,31 @@
 import requests
 import logging
-from utils import (
-    OPENAI_CHAT_ENDPOINT,
-    OPENAI_API_KEY_ENHANCER,
-    PLANNER_MODEL,
-    DESIGN_KNOWLEDGE_MODEL,
-    PRE_ENHANCER_MODEL,
-    PROMPT_ENHANCER_MODEL,
-    GPT_IMAGE_MODEL,
-    logger
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
 )
+logger = logging.getLogger(__name__)
+
+# API configuration
+OPENAI_API_KEY_ENHANCER = os.getenv('OPENAI_API_KEY_ENHANCER')
+OPENAI_API_BASE = "https://api.openai.com/v1"
+OPENAI_CHAT_ENDPOINT = f"{OPENAI_API_BASE}/chat/completions"
+
+# Model names (using standard OpenAI models that are widely available)
+PLANNER_MODEL = "gpt-4o-mini"
+DESIGN_KNOWLEDGE_MODEL = "gpt-4o-mini"
+PRE_ENHANCER_MODEL = "gpt-4o-mini"
+PROMPT_ENHANCER_MODEL = "gpt-4o-mini"
+GPT_IMAGE_MODEL = "dall-e-3"
+SVG_GENERATOR_MODEL = "gpt-4o-mini"
+CHAT_ASSISTANT_MODEL = "gpt-4o-mini"
 
 def check_vector_suitability(user_input):
     """Check if the prompt is suitable for SVG vector graphics"""
