@@ -1457,6 +1457,9 @@ Create a single, perfectly combined SVG that merges both elements beautifully.""
         # Unescape HTML entities
         combined_svg = html.unescape(combined_svg)
 
+        # Remove optional XML declarations before the <svg> element
+        combined_svg = re.sub(r'^<\?xml[^>]*>\s*', '', combined_svg)
+
         svg_match = re.search(r'<svg[^>]*>.*?</svg>', combined_svg, re.DOTALL)
 
         if svg_match:
