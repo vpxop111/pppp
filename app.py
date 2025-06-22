@@ -5,6 +5,7 @@ import json
 import logging
 from flask_cors import CORS
 import re
+import html
 import base64
 from io import BytesIO
 import cairosvg
@@ -1444,13 +1445,22 @@ Create a single, perfectly combined SVG that merges both elements beautifully.""
             return simple_combine_svgs_fallback(text_svg_code, traced_svg_code)
 
         ai_response = response_data["choices"][0]["message"]["content"]
-        
-        # Extract SVG code from the response
-        svg_pattern = r'<svg.*?</svg>'
-        svg_match = re.search(svg_pattern, ai_response, re.DOTALL)
-        
+        logger.debug(f"AI combination raw response: {ai_response[:200]}...")
+
+        # Handle fenced code blocks
+        combined_svg = ai_response.strip()
+        if "```" in combined_svg:
+            code_match = re.search(r'```(?:svg)?\s*(.*?)\s*```', combined_svg, re.DOTALL)
+            if code_match:
+                combined_svg = code_match.group(1).strip()
+
+        # Unescape HTML entities
+        combined_svg = html.unescape(combined_svg)
+
+        svg_match = re.search(r'<svg[^>]*>.*?</svg>', combined_svg, re.DOTALL)
+
         if svg_match:
-            combined_svg = svg_match.group(0)
+            combined_svg = svg_match.group(0).strip()
             logger.info("AI successfully combined SVGs")
             return combined_svg
         else:
