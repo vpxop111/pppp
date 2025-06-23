@@ -5,7 +5,6 @@ import json
 import logging
 from flask_cors import CORS
 import re
-import html
 import base64
 from io import BytesIO
 import cairosvg
@@ -1445,118 +1444,52 @@ Create a single, perfectly combined SVG that merges both elements beautifully.""
             return simple_combine_svgs_fallback(text_svg_code, traced_svg_code)
 
         ai_response = response_data["choices"][0]["message"]["content"]
-        logger.debug(f"AI combination raw response: {ai_response[:500]}...") # Log more for debugging
-
-        # Attempt to extract SVG content
-        combined_svg = ai_response.strip()
-
-        # Priority 1: Fenced code blocks
-        code_block_match = re.search(r'```(?:svg)?\s*(<svg.*?</svg>)\s*```', combined_svg, re.DOTALL | re.IGNORECASE)
-        if code_block_match:
-            combined_svg = code_block_match.group(1).strip()
-            logger.info("Extracted SVG from fenced code block.")
-        else:
-            # Priority 2: Direct SVG tag match (more flexible)
-            direct_svg_match = re.search(r'<svg(?:.|\n)*?</svg>', combined_svg, re.DOTALL | re.IGNORECASE)
-            if direct_svg_match:
-                combined_svg = direct_svg_match.group(0).strip()
-                logger.info("Extracted SVG using direct tag match.")
-            else:
-                # Log the problematic response if no SVG is found by common methods
-                logger.warning(f"Could not find SVG in AI response using common patterns. Raw response snippet: {ai_response[:1000]}")
-                # Fallback if no SVG is found by primary methods
-                return simple_combine_svgs_fallback(text_svg_code, traced_svg_code)
-
-        # Comprehensive unescaping of HTML entities
-        # Apply multiple passes for nested entities, though typically one is enough
-        for _ in range(3): # Max 3 passes to avoid infinite loops with malformed entities
-            prev_svg = combined_svg
-            combined_svg = html.unescape(combined_svg)
-            if combined_svg == prev_svg:
-                break
-
-        # Basic validation: Check if it looks like an SVG
-        if combined_svg.lower().startswith("<svg") and combined_svg.lower().endswith("</svg>"):
-            logger.info("AI successfully combined and extracted SVG.")
+        
+        # Extract SVG code from the response
+        svg_pattern = r'<svg.*?</svg>'
+        svg_match = re.search(svg_pattern, ai_response, re.DOTALL)
+        
+        if svg_match:
+            combined_svg = svg_match.group(0)
+            logger.info("AI successfully combined SVGs")
             return combined_svg
         else:
-            logger.warning(f"Extracted content does not appear to be a valid SVG. Content snippet: {combined_svg[:200]}... Using fallback.")
-            logger.debug(f"Full problematic extracted content before fallback: {combined_svg}")
+            logger.warning("Could not extract SVG from AI response, using fallback")
             return simple_combine_svgs_fallback(text_svg_code, traced_svg_code)
             
     except Exception as e:
         logger.error(f"Error in AI SVG combination: {str(e)}")
-        logger.exception("Full traceback for AI SVG combination error:")
         # Fallback to simple combination
         return simple_combine_svgs_fallback(text_svg_code, traced_svg_code)
 
 def simple_combine_svgs_fallback(text_svg_code, traced_svg_code):
-    """Fallback simple combination method with enhanced logging."""
-    logger.warning("Executing fallback SVG combination logic.")
-    logger.debug(f"Fallback input - Text SVG (first 200 chars): {text_svg_code[:200]}")
-    logger.debug(f"Fallback input - Traced SVG (first 200 chars): {traced_svg_code[:200]}")
-
+    """Fallback simple combination method"""
     try:
-        # Attempt to extract content from both SVGs
-        # More robust extraction to handle SVGs that might be incomplete or slightly malformed
-        text_content_match = re.search(r'<svg[^>]*>(.*)</svg>', text_svg_code, re.DOTALL | re.IGNORECASE)
-        traced_content_match = re.search(r'<svg[^>]*>(.*)</svg>', traced_svg_code, re.DOTALL | re.IGNORECASE)
-
-        text_content = text_content_match.group(1).strip() if text_content_match else None
-        traced_content = traced_content_match.group(1).strip() if traced_content_match else None
-
-        if not text_content and not traced_content:
-            logger.error("Fallback failed: Could not extract content from either SVG. Returning an empty SVG.")
-            return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" width="1080" height="1080"><text x="50" y="50">Error: Could not combine SVGs.</text></svg>'
-        elif not text_content:
-            logger.warning("Fallback: Text SVG content extraction failed. Returning only traced SVG content.")
-            # Wrap traced_content in a new SVG structure if it's just content
-            return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" width="1080" height="1080">{traced_content}</svg>'
-        elif not traced_content:
-            logger.warning("Fallback: Traced SVG content extraction failed. Returning only text SVG content.")
-            # Wrap text_content in a new SVG structure
-            return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" width="1080" height="1080">{text_content}</svg>'
-
+        # Extract content from both SVGs
+        text_match = re.search(r'<svg[^>]*>(.*?)</svg>', text_svg_code, re.DOTALL)
+        traced_match = re.search(r'<svg[^>]*>(.*?)</svg>', traced_svg_code, re.DOTALL)
+        
+        if not text_match or not traced_match:
+            logger.warning("Could not extract SVG content, returning traced SVG")
+            return traced_svg_code
+        
+        text_content = text_match.group(1).strip()
+        traced_content = traced_match.group(1).strip()
+        
         # Create combined SVG
-        # Ensure viewBox and dimensions are present. Prioritize traced_svg for these attributes.
-        viewBox = "0 0 1080 1080"
-        width = "1080"
-        height = "1080"
-
-        traced_svg_attrs_match = re.search(r'<svg([^>]*)>', traced_svg_code, re.IGNORECASE)
-        if traced_svg_attrs_match:
-            attrs_str = traced_svg_attrs_match.group(1)
-            viewBox_match = re.search(r'viewBox="([^"]*)"', attrs_str, re.IGNORECASE)
-            width_match = re.search(r'width="([^"]*)"', attrs_str, re.IGNORECASE)
-            height_match = re.search(r'height="([^"]*)"', attrs_str, re.IGNORECASE)
-            if viewBox_match: viewBox = viewBox_match.group(1)
-            if width_match: width = width_match.group(1)
-            if height_match: height = height_match.group(1)
-
-        combined_svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="{viewBox}" width="{width}" height="{height}">
-  <g id="background-layer" opacity="0.95"> <!-- Slightly increased opacity for better visibility -->
+        combined_svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" width="1080" height="1080">
+  <g id="background-layer" opacity="0.9">
     {traced_content}
   </g>
   <g id="text-layer">
     {text_content}
   </g>
 </svg>'''
-        logger.info("Fallback SVG combination successful.")
+        
         return combined_svg
-
     except Exception as e:
-        logger.error(f"Error during fallback SVG combination: {str(e)}")
-        logger.exception("Full traceback for fallback SVG combination error:")
-        # Return the traced_svg_code as a last resort if it's a string, otherwise a generic error SVG
-        if isinstance(traced_svg_code, str) and traced_svg_code.strip().lower().startswith("<svg"):
-            logger.warning("Fallback combination failed catastrophically, returning original traced SVG.")
-            return traced_svg_code
-        elif isinstance(text_svg_code, str) and text_svg_code.strip().lower().startswith("<svg"):
-            logger.warning("Fallback combination failed catastrophically, returning original text SVG.")
-            return text_svg_code
-        else:
-            logger.error("Fallback combination failed catastrophically, returning error SVG.")
-            return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" width="1080" height="1080"><text x="50" y="50" fill="red">Critical Error in SVG Fallback.</text></svg>'
+        logger.error(f"Error in fallback SVG combination: {str(e)}")
+        return traced_svg_code
 
 @app.route('/api/generate-parallel-svg', methods=['POST'])
 def generate_parallel_svg():
