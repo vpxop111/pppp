@@ -417,137 +417,148 @@ Ensure the final prompt guides the SVG generator to produce a complete, eye-catc
     return response_data["choices"][0]["message"]["content"]
 
 def enhance_prompt_for_gpt_image(user_prompt, design_context=None):
-    """Enhance user prompt specifically for GPT Image-1 to create better designs"""
+    """Enhance user prompt using OpenAI specifically for GPT Image-1 to create mind-blowing designs"""
+    logger.info(f"Enhancing prompt for GPT Image-1: {user_prompt[:100]}...")
+    
+    url = OPENAI_CHAT_ENDPOINT
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
+    }
 
-    # Analyze the prompt to determine design type
+    # Analyze prompt to determine design type for specialized enhancement
     prompt_lower = user_prompt.lower()
+    is_coming_soon = any(word in prompt_lower for word in ['coming soon', 'coming', 'soon', 'announcement', 'launch', 'reveal'])
+    is_testimonial = any(word in prompt_lower for word in ['testimonial', 'review', 'quote', 'feedback', 'recommendation'])
+    is_poster = any(word in prompt_lower for word in ['poster', 'flyer', 'announcement', 'event'])
 
-    # Design type detection
-    is_poster = any(word in prompt_lower for word in ['poster', 'flyer', 'announcement', 'event', 'coming soon'])
-    is_logo = any(word in prompt_lower for word in ['logo', 'brand', 'company', 'business', 'startup'])
-    is_card = any(word in prompt_lower for word in ['card', 'testimonial', 'review', 'quote'])
-    is_banner = any(word in prompt_lower for word in ['banner', 'header', 'cover', 'social media'])
-    is_infographic = any(word in prompt_lower for word in ['infographic', 'chart', 'data', 'statistics'])
+    # Create specialized system prompt based on design type
+    if is_coming_soon:
+        system_prompt = """You are an expert prompt enhancer for GPT Image-1, specializing in creating MIND-BLOWING "Coming Soon" posters that stop viewers in their tracks. Transform user requests into detailed, specific prompts that will generate visually stunning coming soon designs.
 
-    # Base quality enhancers for GPT Image-1
-    base_quality = [
-        "professional design",
-        "high-quality graphics",
-        "clean composition",
-        "modern aesthetic",
-        "balanced layout",
-        "crisp typography",
-        "vibrant colors",
-        "well-defined elements",
-        "clear visual hierarchy",
-        "polished finish"
-    ]
+Your enhanced prompts should focus on:
+1. VISUAL IMPACT: Eye-catching elements, dramatic lighting, bold compositions
+2. TYPOGRAPHY: Massive, attention-grabbing "COMING SOON" text with premium fonts
+3. COLOR SCHEMES: Vibrant gradients, neon accents, or sophisticated palettes
+4. BACKGROUND ELEMENTS: Dynamic textures, abstract patterns, or cinematic backdrops
+5. MOOD & ATMOSPHERE: Excitement, anticipation, premium quality, exclusivity
+6. TECHNICAL SPECS: 1024x1024, high contrast, GPT Image-1 optimized
 
-    # Design-specific enhancements
-    if is_poster:
-        specific_enhancements = [
-            "eye-catching poster design",
-            "bold headline typography",
-            "compelling visual focal point",
-            "structured information layout",
-            "attention-grabbing color scheme",
-            "professional poster composition",
-            "clear call-to-action placement",
-            "balanced text and imagery"
-        ]
-    elif is_logo:
-        specific_enhancements = [
-            "distinctive logo design",
-            "memorable brand identity",
-            "scalable vector-friendly graphics",
-            "simple yet impactful design",
-            "professional brand aesthetics",
-            "clean geometric shapes",
-            "timeless design approach",
-            "versatile color palette"
-        ]
-    elif is_card:
-        specific_enhancements = [
-            "elegant card design",
-            "testimonial-focused layout",
-            "professional presentation",
-            "readable typography hierarchy",
-            "trustworthy visual design",
-            "clean background treatment",
-            "balanced content arrangement",
-            "credible aesthetic appeal"
-        ]
-    elif is_banner:
-        specific_enhancements = [
-            "dynamic banner design",
-            "horizontal composition",
-            "social media optimized",
-            "engaging visual elements",
-            "brand-consistent styling",
-            "clear messaging hierarchy",
-            "platform-appropriate design",
-            "scroll-stopping appeal"
-        ]
-    elif is_infographic:
-        specific_enhancements = [
-            "data visualization design",
-            "information hierarchy",
-            "chart and graph elements",
-            "educational layout",
-            "statistical presentation",
-            "clear data storytelling",
-            "professional infographic style",
-            "engaging data design"
-        ]
+Enhancement Guidelines:
+- Use words like "explosive", "dramatic", "premium", "cutting-edge", "revolutionary"
+- Specify exact color palettes with hex codes when possible
+- Include lighting effects (neon glow, dramatic shadows, spotlights)
+- Add texture details (metallic, glass, holographic, matte)
+- Specify typography styles (futuristic, bold sans-serif, modern)
+- Include composition details (centered, asymmetrical, dynamic)
+
+Return ONLY the enhanced prompt optimized for GPT Image-1, no explanations."""
+
+    elif is_testimonial:
+        system_prompt = """You are an expert prompt enhancer for GPT Image-1, specializing in creating MIND-BLOWING testimonial posters that build trust and credibility while being visually stunning. Transform user requests into detailed prompts for generating powerful testimonial designs.
+
+Your enhanced prompts should focus on:
+1. TRUST ELEMENTS: Professional layouts, clean typography, credible visual design
+2. VISUAL HIERARCHY: Clear quote presentation, prominent attribution, star ratings
+3. COLOR PSYCHOLOGY: Trust-building colors (blues, whites, golds), sophisticated palettes
+4. BACKGROUND DESIGN: Clean, professional, or subtly branded backgrounds
+5. TYPOGRAPHY: Readable quote fonts, professional attribution text, emphasis on key phrases
+6. CREDIBILITY INDICATORS: Stars, badges, professional photos, company logos
+7. TECHNICAL SPECS: 1024x1024, high readability, clean composition
+
+Enhancement Guidelines:
+- Use words like "professional", "trustworthy", "credible", "polished", "authentic"
+- Specify clean, readable typography with proper hierarchy
+- Include trust-building visual elements (5-star ratings, checkmarks, badges)
+- Add professional color schemes with hex codes
+- Specify background treatments (gradient, texture, clean)
+- Include layout details (centered quotes, side attribution, balanced composition)
+
+Return ONLY the enhanced prompt optimized for GPT Image-1, no explanations."""
+
+    elif is_poster:
+        system_prompt = """You are an expert prompt enhancer for GPT Image-1, specializing in creating MIND-BLOWING posters that capture attention and communicate effectively. Transform user requests into detailed prompts for generating visually stunning poster designs.
+
+Your enhanced prompts should focus on:
+1. VISUAL IMPACT: Bold compositions, striking imagery, attention-grabbing elements
+2. TYPOGRAPHY: Powerful headlines, clear hierarchy, readable text
+3. COLOR SCHEMES: Vibrant, purposeful color palettes that match the message
+4. LAYOUT: Balanced composition, clear focal points, effective use of space
+5. MOOD & MESSAGE: Appropriate atmosphere that supports the poster's purpose
+6. TECHNICAL SPECS: 1024x1024, high contrast, print-ready quality
+
+Enhancement Guidelines:
+- Use descriptive words for visual impact and mood
+- Specify exact color palettes and typography styles
+- Include composition and layout details
+- Add texture and effect specifications
+- Focus on the poster's purpose and target audience
+
+Return ONLY the enhanced prompt optimized for GPT Image-1, no explanations."""
+
     else:
-        specific_enhancements = [
-            "versatile graphic design",
-            "adaptable visual style",
-            "multi-purpose layout",
-            "flexible design approach",
-            "universal appeal",
-            "broad application design"
-        ]
+        system_prompt = """You are an expert prompt enhancer for GPT Image-1, specializing in creating MIND-BLOWING graphic designs that are visually stunning and professionally crafted. Transform user requests into detailed prompts optimized for GPT Image-1.
 
-    # Technical specifications for GPT Image-1
-    technical_specs = [
-        "1024x1024 resolution",
-        "RGB color space",
-        "high contrast elements",
-        "clear edge definition",
-        "optimal text readability",
-        "vector-conversion friendly",
-        "clean background separation",
-        "distinct element boundaries"
-    ]
+Your enhanced prompts should focus on:
+1. VISUAL EXCELLENCE: Premium quality, professional finish, striking aesthetics
+2. COMPOSITION: Balanced layouts, clear hierarchy, effective use of space
+3. COLOR & STYLE: Sophisticated palettes, modern aesthetics, brand-appropriate
+4. TYPOGRAPHY: Professional fonts, readable text, proper hierarchy
+5. TECHNICAL QUALITY: 1024x1024, high resolution, crisp details
+6. PURPOSE: Design that serves its intended function effectively
 
-    # Build enhanced prompt
-    enhanced_parts = []
+Enhancement Guidelines:
+- Use descriptive, specific language for visual elements
+- Include technical specifications for optimal GPT Image-1 output
+- Specify colors, fonts, layouts, and effects in detail
+- Focus on professional, high-quality results
 
-    # Add original request
-    enhanced_parts.append(f"Create: {user_prompt}")
+Return ONLY the enhanced prompt optimized for GPT Image-1, no explanations."""
 
-    # Add design context if provided
+    # Prepare the user content
+    user_content = f"Original request: {user_prompt}"
     if design_context:
-        enhanced_parts.append(f"Context: {design_context[:200]}...")
+        user_content += f"\n\nDesign context: {design_context[:300]}..."
 
-    # Add design type specific enhancements
-    enhanced_parts.append(f"Style: {', '.join(specific_enhancements[:4])}")
+    payload = {
+        "model": PROMPT_ENHANCER_MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": system_prompt
+            },
+            {
+                "role": "user",
+                "content": user_content
+            }
+        ],
+        "temperature": 0.8,
+        "max_tokens": 800
+    }
 
-    # Add quality requirements
-    enhanced_parts.append(f"Quality: {', '.join(base_quality[:6])}")
+    try:
+        logger.info(f"Calling OpenAI for GPT Image-1 prompt enhancement with model: {PROMPT_ENHANCER_MODEL}")
+        response = requests.post(url, headers=headers, json=payload)
+        response_data = response.json()
 
-    # Add technical requirements
-    enhanced_parts.append(f"Technical: {', '.join(technical_specs[:4])}")
+        if response.status_code != 200:
+            logger.error(f"OpenAI API error for GPT Image enhancement: {response_data}")
+            # Fallback to original prompt if API fails
+            return user_prompt
 
-    # Combine into final prompt
-    final_prompt = " | ".join(enhanced_parts)
+        enhanced_prompt = response_data["choices"][0]["message"]["content"].strip()
+        
+        # Ensure prompt isn't too long for GPT Image-1
+        if len(enhanced_prompt) > 1000:
+            enhanced_prompt = enhanced_prompt[:1000] + "..."
+        
+        logger.info(f"Successfully enhanced prompt for GPT Image-1: {enhanced_prompt[:100]}...")
+        return enhanced_prompt
 
-    # Ensure prompt isn't too long (GPT Image-1 has limits)
-    if len(final_prompt) > 1000:
-        final_prompt = final_prompt[:1000] + "..."
-
-    return final_prompt
+    except Exception as e:
+        logger.error(f"Error enhancing prompt for GPT Image-1: {str(e)}")
+        # Return original prompt as fallback
+        return user_prompt
 
 def generate_image_with_gpt(enhanced_prompt, design_context=None):
     """Generate image using GPT Image-1 model with enhanced prompting"""
