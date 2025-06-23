@@ -151,7 +151,7 @@ Provide guidance if the request isn't suitable."""
     }
 
 def plan_design(user_input):
-    """Plan the design approach based on user input"""
+    """Plan the design approach based on user input with enhanced focus on image generation quality"""
     logger.info(f"Planning design for: {user_input[:100]}...")
     
     url = OPENAI_CHAT_ENDPOINT
@@ -160,52 +160,133 @@ def plan_design(user_input):
         "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
     }
 
+    # Detect design type for specialized planning
+    prompt_lower = user_input.lower()
+    is_coming_soon = any(word in prompt_lower for word in ['coming soon', 'coming', 'soon', 'announcement', 'launch'])
+    is_testimonial = any(word in prompt_lower for word in ['testimonial', 'review', 'quote', 'feedback'])
+
+    if is_coming_soon:
+        system_content = """You are a design planner specializing in STUNNING "Coming Soon" posters that generate massive excitement and anticipation. Create a strategic plan that will result in visually explosive, high-impact designs.
+
+Your plan must deliver:
+1. VISUAL IMPACT STRATEGY
+   - Explosive main focal point (what grabs attention first)
+   - Dynamic composition layout (diagonal, asymmetrical, or centered power)
+   - Color psychology for excitement (neon, gradient, high-contrast combinations)
+   - Lighting effects strategy (glow, spotlights, dramatic shadows)
+
+2. TYPOGRAPHY MASTERY
+   - Massive "COMING SOON" text treatment (size, style, effects)
+   - Font psychology (futuristic, bold, premium, cutting-edge)
+   - Text effects (3D, neon glow, metallic, holographic)
+   - Hierarchy for secondary text (date, brand, tagline)
+
+3. COLOR EXPLOSION
+   - Primary color scheme with exact hex codes
+   - Gradient directions and color stops
+   - Accent colors for highlights and effects
+   - Background color strategy (dark dramatic, bright energy, or gradient)
+
+4. BACKGROUND MAGIC
+   - Texture strategy (metallic, glass, abstract, geometric)
+   - Pattern elements (circles, lines, shapes, particles)
+   - Depth layers (foreground, middle, background)
+   - Motion implications (speed lines, blur effects, energy)
+
+5. EMOTIONAL TRIGGERS
+   - Excitement amplifiers (burst effects, energy rays)
+   - Anticipation builders (countdown elements, mystery)
+   - Premium quality indicators (luxury textures, refined details)
+   - Urgency creators (limited time, exclusive access)
+
+Focus on creating a plan that will generate a poster that people CAN'T ignore and MUST share."""
+
+    elif is_testimonial:
+        system_content = """You are a design planner specializing in POWERFUL testimonial posters that build massive trust and credibility while being visually stunning. Create a strategic plan for testimonials that convert.
+
+Your plan must deliver:
+1. TRUST-BUILDING VISUAL STRATEGY
+   - Professional layout that screams credibility
+   - Clean composition with perfect balance
+   - Color psychology for trust (blues, whites, golds, professional grays)
+   - Subtle premium effects that enhance rather than distract
+
+2. TESTIMONIAL HIERARCHY MASTERY
+   - Quote presentation strategy (size, placement, emphasis)
+   - Attribution prominence (name, title, company, photo)
+   - Star rating visual treatment (size, color, placement)
+   - Supporting elements (badges, logos, certifications)
+
+3. COLOR PSYCHOLOGY FOR CONVERSION
+   - Primary trust colors with exact hex codes
+   - Professional gradient strategies
+   - Accent colors for highlights and call-to-action elements
+   - Background color for credibility and readability
+
+4. CREDIBILITY ENHANCEMENT
+   - Visual trust indicators (5-star ratings, badges, checkmarks)
+   - Professional photography suggestions
+   - Company logo integration strategy
+   - Background texture (subtle, professional, clean)
+
+5. READABILITY PERFECTION
+   - Font strategy for maximum readability
+   - Contrast ratios for accessibility
+   - White space utilization for focus
+   - Visual flow for easy consumption
+
+6. CONVERSION OPTIMIZATION
+   - Call-to-action placement and design
+   - Social proof amplification techniques
+   - Visual elements that encourage action
+   - Mobile-friendly design considerations
+
+Focus on creating testimonials that build immediate trust and drive action."""
+
+    else:
+        system_content = """You are a design planner specializing in HIGH-IMPACT visual designs that generate amazing results. Create a strategic plan focused on maximum visual appeal and professional quality.
+
+Your plan must deliver:
+1. VISUAL IMPACT STRATEGY
+   - Attention-grabbing focal points
+   - Dynamic composition and layout
+   - Color strategy for maximum appeal
+   - Professional finishing touches
+
+2. DESIGN EXCELLENCE
+   - Typography mastery and hierarchy
+   - Color psychology and harmony
+   - Layout perfection and balance
+   - Visual effects and enhancements
+
+3. PROFESSIONAL QUALITY
+   - Technical specifications for crisp output
+   - Brand consistency and appeal
+   - Target audience optimization
+   - Platform-specific considerations
+
+4. IMPLEMENTATION ROADMAP
+   - Priority elements and order
+   - Quality checkpoints
+   - Enhancement opportunities
+   - Final optimization steps
+
+Focus on creating designs that stand out and deliver results."""
+
     payload = {
         "model": PLANNER_MODEL,
         "messages": [
             {
                 "role": "system",
-                "content": """You are a design planner specializing in high-quality posters, logos, and branding materials. Create a structured plan for the user's request that focuses on visual impact, cohesive color themes, and professional composition.
-
-Your plan should include:
-1. Design Goals
-   - Main purpose and intended use (e.g., poster, logo)
-   - Target audience and mood
-   - Key message and visual emotion
-
-2. Visual Composition
-   - Overall layout structure and focal points
-   - Background elements (colors, gradients, textures)
-   - Visual hierarchy and balance
-
-3. Typography and Style
-   - Font choices, sizes, and pairings
-   - Spacing, alignment, and hierarchy
-
-4. Color and Branding
-   - Suggested color palette with hex/RGB codes
-   - Background and accent color recommendations
-   - Mood or theme descriptors (e.g., vibrant, minimal, elegant)
-
-5. Technical and Production Considerations
-   - SVG optimization requirements and file size targets
-   - Responsive design and browser compatibility
-   - Logo integration and branding guidelines
-
-6. Implementation Strategy
-   - Component breakdown and creation order
-   - Special effects or patterns (shadows, overlays)
-   - Testing and validation steps
-
-Be specific, practical, and focus on creating a visually compelling poster or logo that aligns with the user's request."""
+                "content": system_content
             },
             {
                 "role": "user",
                 "content": user_input
             }
         ],
-        "temperature": 0.7,
-        "max_tokens": 1000
+        "temperature": 0.8,
+        "max_tokens": 1200
     }
 
     response = requests.post(url, headers=headers, json=payload)
@@ -218,7 +299,7 @@ Be specific, practical, and focus on creating a visually compelling poster or lo
     return response_data["choices"][0]["message"]["content"]
 
 def generate_design_knowledge(design_plan, user_input):
-    """Generate specific design knowledge based on the plan and user input"""
+    """Generate specific design knowledge based on the plan and user input with focus on stunning visuals"""
     logger.info("Generating design knowledge...")
     
     url = OPENAI_CHAT_ENDPOINT
@@ -227,48 +308,148 @@ def generate_design_knowledge(design_plan, user_input):
         "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
     }
 
+    # Detect design type for specialized knowledge
+    prompt_lower = user_input.lower()
+    is_coming_soon = any(word in prompt_lower for word in ['coming soon', 'coming', 'soon', 'announcement', 'launch'])
+    is_testimonial = any(word in prompt_lower for word in ['testimonial', 'review', 'quote', 'feedback'])
+
+    if is_coming_soon:
+        system_content = """You are a design knowledge expert specializing in creating VIRAL "Coming Soon" posters that break the internet. Based on the design plan, provide cutting-edge insights and techniques to create visually explosive designs.
+
+Provide ADVANCED knowledge for:
+
+1. VISUAL EXPLOSION TECHNIQUES
+   - Advanced color harmony for maximum impact (triadic, tetradic, split-complementary)
+   - Lighting effect mastery (rim lighting, volumetric rays, neon glows)
+   - Composition secrets (rule of thirds, golden ratio, dynamic symmetry)
+   - Depth creation techniques (parallax layers, atmospheric perspective)
+
+2. TYPOGRAPHY THAT COMMANDS ATTENTION
+   - Font psychology and emotional triggers
+   - Advanced text effects (bevels, extrusions, reflections, shadows)
+   - Kerning and tracking for impact
+   - Font pairing science for excitement and energy
+
+3. COLOR SCIENCE FOR EXCITEMENT
+   - Exact hex codes for high-energy palettes
+   - Gradient angle mathematics for dynamic flow
+   - Color temperature manipulation for mood
+   - Contrast ratios for accessibility while maintaining impact
+
+4. BACKGROUND MASTERY
+   - Texture creation techniques (procedural, photographic, abstract)
+   - Pattern psychology (geometric, organic, technological)
+   - Depth layer optimization (foreground, middle ground, background)
+   - Motion blur and speed line techniques
+
+5. PSYCHOLOGICAL IMPACT AMPLIFIERS
+   - Visual rhythm for excitement
+   - Scale and proportion for dominance
+   - Negative space utilization for focus
+   - Visual weight distribution for balance
+
+6. TECHNICAL EXCELLENCE FOR IMAGE GENERATION
+   - Prompt structure for GPT Image-1 optimization
+   - Detail specification for crisp generation
+   - Element separation for clarity
+   - Scaling considerations for various platforms
+
+Focus on creating knowledge that will generate images people screenshot and share immediately."""
+
+    elif is_testimonial:
+        system_content = """You are a design knowledge expert specializing in CONVERSION-OPTIMIZED testimonial designs that build massive trust and drive action. Provide advanced insights for creating testimonials that convert.
+
+Provide ADVANCED knowledge for:
+
+1. TRUST-BUILDING VISUAL PSYCHOLOGY
+   - Color psychology for credibility (exact hex codes)
+   - Layout principles that enhance believability
+   - White space utilization for premium feel
+   - Visual hierarchy for maximum impact
+
+2. TYPOGRAPHY FOR CREDIBILITY
+   - Font selection psychology for trust
+   - Reading flow optimization techniques
+   - Quote styling for emphasis and authenticity
+   - Attribution formatting for maximum credibility
+
+3. COLOR SCIENCE FOR CONVERSION
+   - Trust color combinations with exact codes
+   - Professional gradient techniques
+   - Accent color psychology for call-to-action
+   - Background color optimization for readability
+
+4. CREDIBILITY ENHANCEMENT TECHNIQUES
+   - Star rating visual optimization
+   - Badge and certification placement strategy
+   - Professional photo integration techniques
+   - Company logo sizing and placement rules
+
+5. CONVERSION OPTIMIZATION SECRETS
+   - Visual flow design for action
+   - Call-to-action button psychology
+   - Social proof amplification techniques
+   - Mobile-first design principles
+
+6. TECHNICAL EXCELLENCE FOR TESTIMONIALS
+   - Image generation prompt optimization
+   - Text-background contrast optimization
+   - Element spacing for professional appearance
+   - Responsive design considerations
+
+7. AUTHENTICITY INDICATORS
+   - Visual cues that enhance believability
+   - Design elements that reduce skepticism
+   - Professional formatting that builds confidence
+   - Subtle details that amplify trust
+
+Focus on creating knowledge that generates testimonials with maximum conversion power."""
+
+    else:
+        system_content = """You are a design knowledge expert specializing in HIGH-IMPACT visual designs that achieve outstanding results. Provide advanced insights and techniques for creating visually stunning, professional designs.
+
+Provide ADVANCED knowledge for:
+
+1. VISUAL IMPACT MASTERY
+   - Advanced composition techniques
+   - Color harmony and psychology
+   - Typography excellence and hierarchy
+   - Professional finishing techniques
+
+2. DESIGN EXCELLENCE PRINCIPLES
+   - Layout optimization strategies
+   - Visual flow and user journey
+   - Brand consistency techniques
+   - Quality enhancement methods
+
+3. TECHNICAL OPTIMIZATION
+   - Image generation best practices
+   - Detail specification techniques
+   - Platform optimization strategies
+   - Professional quality standards
+
+4. PSYCHOLOGICAL IMPACT
+   - Visual psychology principles
+   - Emotional trigger techniques
+   - Attention-grabbing strategies
+   - Memorable design elements
+
+Focus on creating knowledge that produces exceptional visual results."""
+
     payload = {
         "model": DESIGN_KNOWLEDGE_MODEL,
         "messages": [
             {
                 "role": "system",
-                "content": """You are a design knowledge expert specializing in professional poster and logo creation. Based on the design plan and user request, provide detailed insights, best practices, and actionable recommendations to enhance visual quality and impact.
-
-Include:
-1. Typography and Branding
-   - Font recommendations with pairing suggestions
-   - Hierarchy and spacing for emphasis
-   - Logo integration tips
-
-2. Color and Mood
-   - Cohesive color palette suggestions with hex/RGB values
-   - Contrast, accessibility, and readability guidance
-   - Background color and texture ideas for mood
-
-3. Layout and Composition
-   - Effective grid systems and alignment techniques
-   - Focal point emphasis and visual flow strategies
-   - Balanced use of whitespace and dynamic elements
-
-4. SVG and Graphic Techniques
-   - Path and shape optimization for crisp visuals
-   - Use of overlays, shadows, gradients, and textures
-   - Grouping and layer organization for clarity
-
-5. Technical and Production
-   - Responsive design tips for multiple screen sizes
-   - SVG file size optimization and performance
-   - Cross-browser compatibility considerations
-
-Provide clear, practical recommendations to elevate the design quality for posters, logos, and branding materials."""
+                "content": system_content
             },
             {
                 "role": "user",
                 "content": f"Design Plan:\n{design_plan}\n\nUser Request:\n{user_input}"
             }
         ],
-        "temperature": 0.7,
-        "max_tokens": 1500
+        "temperature": 0.8,
+        "max_tokens": 1800
     }
 
     response = requests.post(url, headers=headers, json=payload)
@@ -281,7 +462,7 @@ Provide clear, practical recommendations to elevate the design quality for poste
     return response_data["choices"][0]["message"]["content"]
 
 def pre_enhance_prompt(user_input):
-    """Initial enhancement of user query using standard GPT-4o mini"""
+    """Initial enhancement of user query with focus on generating stunning visuals"""
     logger.info(f"Pre-enhancing prompt: {user_input[:100]}...")
     
     url = OPENAI_CHAT_ENDPOINT
@@ -290,53 +471,136 @@ def pre_enhance_prompt(user_input):
         "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
     }
 
+    # Detect design type for specialized enhancement
+    prompt_lower = user_input.lower()
+    is_coming_soon = any(word in prompt_lower for word in ['coming soon', 'coming', 'soon', 'announcement', 'launch'])
+    is_testimonial = any(word in prompt_lower for word in ['testimonial', 'review', 'quote', 'feedback'])
+
+    if is_coming_soon:
+        system_content = """You are an expert prompt enhancer specializing in MIND-BLOWING "Coming Soon" designs that generate massive excitement. Transform the design plan and knowledge into a powerful, detailed prompt optimized for creating viral-worthy coming soon visuals.
+
+Your enhanced prompt must include:
+
+1. EXPLOSIVE VISUAL COMPOSITION
+   - Dramatic focal point placement with mathematical precision
+   - Dynamic layout structure (diagonal dominance, asymmetrical power, or centered explosion)
+   - Visual hierarchy that creates immediate impact
+   - Depth layers that create cinematic quality
+
+2. TYPOGRAPHY THAT STOPS TRAFFIC
+   - Massive "COMING SOON" text with specific size relationships
+   - Font family psychology (futuristic sans-serif, bold display, or custom lettering)
+   - Advanced text effects (3D extrusion, neon glow, metallic finish, holographic)
+   - Secondary text hierarchy with exact proportions
+
+3. COLOR EXPLOSION SCIENCE
+   - Primary color palette with exact hex codes for maximum energy
+   - Gradient specifications (angles, color stops, blending modes)
+   - Accent colors for highlights and special effects
+   - Background color strategy for dramatic contrast
+
+4. BACKGROUND MAGIC TECHNIQUES
+   - Texture specifications (metallic, glass, carbon fiber, holographic)
+   - Pattern elements (geometric shapes, particle effects, energy lines)
+   - Lighting effects (rim lighting, volumetric rays, neon glow)
+   - Motion implications (speed blur, energy trails, burst effects)
+
+5. EMOTIONAL TRIGGER ELEMENTS
+   - Excitement amplifiers (burst rays, energy particles, light flares)
+   - Anticipation builders (countdown elements, mystery shadows)
+   - Premium indicators (luxury textures, refined details, gold accents)
+   - Urgency creators (limited time visuals, exclusive badges)
+
+Transform the context into a complete, actionable prompt that will generate a coming soon poster people can't stop looking at."""
+
+    elif is_testimonial:
+        system_content = """You are an expert prompt enhancer specializing in CONVERSION-OPTIMIZED testimonial designs that build massive trust and drive action. Transform the design plan and knowledge into a powerful prompt for creating testimonials that convert.
+
+Your enhanced prompt must include:
+
+1. TRUST-BUILDING COMPOSITION
+   - Professional layout structure with perfect balance
+   - Visual hierarchy that guides eye flow to key elements
+   - Clean composition that screams credibility
+   - White space utilization for premium feel
+
+2. TESTIMONIAL PRESENTATION MASTERY
+   - Quote formatting with optimal size and emphasis
+   - Attribution placement with perfect prominence
+   - Star rating visual treatment with maximum impact
+   - Supporting elements (badges, logos, certifications) placement
+
+3. COLOR PSYCHOLOGY FOR CONVERSION
+   - Trust-building color palette with exact hex codes
+   - Professional gradient techniques for depth
+   - Accent colors for call-to-action elements
+   - Background colors that enhance readability and credibility
+
+4. CREDIBILITY ENHANCEMENT ELEMENTS
+   - 5-star rating visual optimization
+   - Professional badge and certification styling
+   - Company logo integration with proper sizing
+   - Background texture that enhances rather than distracts
+
+5. READABILITY AND FLOW OPTIMIZATION
+   - Font selection for maximum credibility and readability
+   - Text contrast ratios for perfect accessibility
+   - Visual flow design that leads to action
+   - Mobile-friendly design specifications
+
+6. CONVERSION AMPLIFICATION
+   - Call-to-action button design and placement
+   - Social proof visual amplification
+   - Trust indicator positioning and styling
+   - Overall design that reduces skepticism and builds confidence
+
+Transform the context into a complete, actionable prompt that will generate testimonials with maximum conversion power."""
+
+    else:
+        system_content = """You are an expert prompt enhancer specializing in HIGH-IMPACT visual designs that achieve outstanding results. Transform the design plan and knowledge into a powerful, detailed prompt optimized for creating stunning visuals.
+
+Your enhanced prompt must include:
+
+1. VISUAL IMPACT COMPOSITION
+   - Strategic focal point placement for maximum attention
+   - Dynamic layout structure for professional appeal
+   - Visual hierarchy that guides viewer attention
+   - Balanced composition with purposeful elements
+
+2. PROFESSIONAL TYPOGRAPHY
+   - Font selection with psychological impact
+   - Text hierarchy with perfect proportions
+   - Typography effects for enhanced appeal
+   - Readable yet impactful text treatment
+
+3. COLOR MASTERY
+   - Color palette with exact hex codes for desired mood
+   - Strategic color placement for visual flow
+   - Background and accent color coordination
+   - Professional color combinations for target audience
+
+4. TECHNICAL EXCELLENCE
+   - High-resolution specifications for crisp output
+   - Element spacing for professional appearance
+   - Quality standards for polished finish
+   - Platform optimization considerations
+
+Transform the context into a complete, actionable prompt that produces exceptional visual results."""
+
     payload = {
         "model": PRE_ENHANCER_MODEL,
         "messages": [
             {
                 "role": "system",
-                "content": """You are an expert design prompt enhancer. Enhance the user's design request into a highly detailed, technical specification optimized for creating professional-quality posters, logos, and branding materials.
-
-Your enhanced prompt should include:
-1. Layout and Composition
-   - Overall structure and visual flow
-   - Focal points and visual hierarchy
-   - Balance, symmetry, and use of whitespace
-
-2. Typography
-   - Font styles and families with pairing recommendations
-   - Font sizes with emphasis hierarchy
-   - Text alignment and letter spacing
-
-3. Color and Atmosphere
-   - Cohesive color palette suggestions with hex/RGB codes
-   - Background colors, gradients, and texture ideas
-   - Mood and style descriptors (e.g., vibrant, elegant, minimalist)
-
-4. Visual Elements and Branding
-   - Background graphics, patterns, or images
-   - Icons, symbols, and decorative shapes
-   - Logo placement and integration tips
-
-5. Technical Requirements
-   - SVG-specific considerations and optimization techniques
-   - Responsive design and scaling guidelines
-   - Browser compatibility and performance optimizations
-
-6. Poster and Logo Aesthetics
-   - Recommendations for cohesion between elements
-   - Suggestions for lighting, shadow, and depth
-   - Tips for making the design stand out visually
-
-Convert the user's brief into a complete, actionable prompt that maintains their original intent while adding all necessary details to produce a visually compelling and professional SVG design."""
+                "content": system_content
             },
             {
                 "role": "user",
                 "content": user_input
             }
         ],
-        "temperature": 0.7,
-        "max_tokens": 1500
+        "temperature": 0.8,
+        "max_tokens": 1800
     }
 
     logger.info(f"Calling OpenAI Chat API for initial prompt enhancement with model: {PRE_ENHANCER_MODEL}")
@@ -1212,68 +1476,134 @@ def chat_assistant():
         return jsonify({"error": error_msg}), 500
 
 def build_advanced_image_prompt(user_input, design_context):
-    """Build an advanced image prompt optimized for parallel SVG processing"""
+    """Build an advanced image prompt optimized for creating stunning visuals"""
+    logger.info(f"Building advanced image prompt: {user_input[:100]}...")
     
-    # Analyze user input for design type and requirements
-    user_lower = user_input.lower()
-
-    # Design type detection with more specific categories
-    design_types = {
-        'poster': ['poster', 'flyer', 'announcement', 'event', 'coming soon', 'promotion'],
-        'logo': ['logo', 'brand', 'company', 'business', 'startup', 'identity'],
-        'card': ['card', 'testimonial', 'review', 'quote', 'recommendation'],
-        'banner': ['banner', 'header', 'cover', 'social media', 'facebook', 'instagram'],
-        'infographic': ['infographic', 'chart', 'data', 'statistics', 'info'],
-        'certificate': ['certificate', 'award', 'diploma', 'achievement'],
-        'invitation': ['invitation', 'invite', 'party', 'wedding', 'event'],
-        'menu': ['menu', 'restaurant', 'food', 'cafe', 'dining'],
-        'brochure': ['brochure', 'pamphlet', 'leaflet', 'booklet']
+    url = OPENAI_CHAT_ENDPOINT
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
     }
 
-    detected_type = 'general'
-    for design_type, keywords in design_types.items():
-        if any(keyword in user_lower for keyword in keywords):
-            detected_type = design_type
-            break
+    # Detect design type for specialized prompt building
+    user_lower = user_input.lower()
+    is_coming_soon = any(word in user_lower for word in ['coming soon', 'coming', 'soon', 'announcement', 'launch'])
+    is_testimonial = any(word in user_lower for word in ['testimonial', 'review', 'quote', 'feedback'])
 
-    # Build prompt components
-    prompt_parts = []
+    if is_coming_soon:
+        system_content = """You are an expert at creating FINAL image generation prompts that produce VIRAL "Coming Soon" visuals. Take the enhanced prompt and design context to create the ultimate prompt for GPT Image-1 that will generate mind-blowing coming soon designs.
 
-    # Core request with design type optimization
-    if detected_type == 'poster':
-        prompt_parts.append(f"Create a professional poster design: {user_input}")
-        prompt_parts.append("Design requirements: Bold typography, clear hierarchy, eye-catching visuals, structured layout")
-        prompt_parts.append("Visual style: High-impact graphics, vibrant colors, professional composition, marketing-focused")
-    elif detected_type == 'logo':
-        prompt_parts.append(f"Create a distinctive logo design: {user_input}")
-        prompt_parts.append("Design requirements: Simple memorable shapes, scalable graphics, clean typography, brand identity")
-        prompt_parts.append("Visual style: Minimalist approach, strong contrast, vector-friendly elements, timeless design")
+Your final prompt must be optimized for:
+
+1. MAXIMUM VISUAL IMPACT
+   - Explosive composition that stops scrolling
+   - Dramatic lighting and effects that create wow factor
+   - Typography that commands immediate attention
+   - Color combinations that create emotional excitement
+
+2. GPT IMAGE-1 OPTIMIZATION
+   - Clear, specific visual descriptions for accurate generation
+   - Technical specifications for crisp 1024x1024 output
+   - Element separation for clean generation
+   - Prompt structure that maximizes generation quality
+
+3. COMING SOON SPECIALIZATION
+   - Language that triggers excitement and anticipation
+   - Visual elements that create buzz and shareability
+   - Design elements that scream "premium" and "exclusive"
+   - Composition that works perfectly for social media sharing
+
+Create a final prompt that will generate a coming soon image that goes viral."""
+
+    elif is_testimonial:
+        system_content = """You are an expert at creating FINAL image generation prompts that produce CONVERSION-OPTIMIZED testimonial visuals. Take the enhanced prompt and design context to create the ultimate prompt for GPT Image-1 that will generate trust-building testimonial designs.
+
+Your final prompt must be optimized for:
+
+1. MAXIMUM CREDIBILITY
+   - Professional composition that builds immediate trust
+   - Typography that enhances believability
+   - Color schemes that psychologically increase conversion
+   - Layout that guides eye flow to key conversion elements
+
+2. GPT IMAGE-1 OPTIMIZATION
+   - Clear specifications for accurate text and element generation
+   - Technical details for crisp professional output
+   - Element positioning for perfect testimonial structure
+   - Quality specifications for credible appearance
+
+3. TESTIMONIAL SPECIALIZATION
+   - Language that generates trust-building visuals
+   - Design elements that reduce skepticism
+   - Visual hierarchy that maximizes quote impact
+   - Professional aesthetics that enhance credibility
+
+Create a final prompt that will generate a testimonial that converts viewers into customers."""
+
     else:
-        prompt_parts.append(f"Create a professional graphic design: {user_input}")
-        prompt_parts.append("Design requirements: Versatile layout, clear visual hierarchy, professional appearance, multi-purpose design")
-        prompt_parts.append("Visual style: Modern aesthetics, balanced composition, adaptable elements, universal appeal")
+        system_content = """You are an expert at creating FINAL image generation prompts that produce HIGH-IMPACT professional visuals. Take the enhanced prompt and design context to create the ultimate prompt for GPT Image-1.
 
-    # Technical specifications for optimal SVG conversion
-    prompt_parts.append("Technical specs: 1024x1024 resolution, high contrast elements, clear edge definition, distinct boundaries")
-    prompt_parts.append("SVG optimization: Vector-friendly graphics, clean background separation, text-image distinction, sharp details")
+Your final prompt must be optimized for:
 
-    # Quality and aesthetic requirements
-    prompt_parts.append("Quality standards: Professional finish, polished appearance, commercial-grade design, publication-ready")
-    prompt_parts.append("Color approach: Vibrant yet balanced palette, good contrast ratios, harmonious color scheme, brand-appropriate")
+1. MAXIMUM VISUAL APPEAL
+   - Professional composition that captures attention
+   - Typography and layout that serves the design purpose
+   - Color schemes that match the intended mood and audience
+   - Visual elements that enhance the design's effectiveness
 
-    # Parallel processing optimization
-    prompt_parts.append("Processing optimization: Clear text-background separation, distinct graphic elements, OCR-friendly text placement")
+2. GPT IMAGE-1 OPTIMIZATION
+   - Clear specifications for accurate generation
+   - Technical details for high-quality output
+   - Element positioning for optimal composition
+   - Quality specifications for professional appearance
 
-    # Combine all parts with separators
-    final_prompt = " || ".join(prompt_parts)
+3. PURPOSE-DRIVEN DESIGN
+   - Language that generates visuals matching the specific need
+   - Design elements that serve the intended function
+   - Professional aesthetics appropriate for the use case
+   - Balanced composition that works across platforms
 
-    # Ensure prompt length is manageable
-    if len(final_prompt) > 1200:
-        # Keep the most important parts
-        essential_parts = prompt_parts[:4]  # Core request + technical specs
-        final_prompt = " || ".join(essential_parts)
+Create a final prompt that will generate exceptional professional visuals."""
 
-    return final_prompt
+    payload = {
+        "model": PROMPT_ENHANCER_MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": system_content
+            },
+            {
+                "role": "user",
+                "content": f"Enhanced Prompt: {user_input}\n\nDesign Context: {design_context[:500]}..."
+            }
+        ],
+        "temperature": 0.7,
+        "max_tokens": 1000
+    }
+
+    try:
+        logger.info("Calling OpenAI for advanced image prompt building")
+        response = requests.post(url, headers=headers, json=payload)
+        response_data = response.json()
+
+        if response.status_code != 200:
+            logger.error(f"OpenAI API error for advanced prompt building: {response_data}")
+            # Fallback to simplified prompt
+            return f"Create a stunning visual design: {user_input}. Professional quality, 1024x1024 resolution, high contrast, vibrant colors, clear typography, balanced composition."
+
+        final_prompt = response_data["choices"][0]["message"]["content"].strip()
+        
+        # Ensure prompt isn't too long for GPT Image-1
+        if len(final_prompt) > 1000:
+            final_prompt = final_prompt[:1000] + "..."
+        
+        logger.info(f"Successfully built advanced image prompt: {final_prompt[:100]}...")
+        return final_prompt
+
+    except Exception as e:
+        logger.error(f"Error building advanced image prompt: {str(e)}")
+        # Return simplified fallback
+        return f"Create a stunning visual design: {user_input}. Professional quality, 1024x1024 resolution, high contrast, vibrant colors, clear typography, balanced composition."
 
 def process_ocr_svg(image_data):
     """Generate a text-only SVG using GPT-4.1-mini by passing the image directly to the chat API."""
