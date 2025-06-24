@@ -1597,7 +1597,16 @@ Create a single, perfectly combined SVG that merges both elements beautifully.""
         ai_response = response_data["choices"][0]["message"]["content"]
         
         # Extract SVG code from the response - improved pattern matching
-        # First try to find SVG within code blocks
+        # First check if the response starts with SVG directly (most common case)
+        if ai_response.strip().startswith('<svg'):
+            # Find the end of the SVG
+            svg_end = ai_response.rfind('</svg>') + 6
+            if svg_end > 5:  # Found closing tag
+                combined_svg = ai_response[:svg_end].strip()
+                logger.info("AI successfully combined SVGs (direct start)")
+                return combined_svg
+        
+        # Try to find SVG within code blocks
         code_block_pattern = r'```(?:svg)?\s*(<svg.*?</svg>)\s*```'
         code_block_match = re.search(code_block_pattern, ai_response, re.DOTALL | re.IGNORECASE)
         
@@ -1606,17 +1615,26 @@ Create a single, perfectly combined SVG that merges both elements beautifully.""
             logger.info("AI successfully combined SVGs (from code block)")
             return combined_svg
         
-        # Then try direct SVG pattern with more flexible matching
+        # Try direct SVG pattern with more flexible matching
         svg_pattern = r'<svg[^>]*>.*?</svg>'
         svg_match = re.search(svg_pattern, ai_response, re.DOTALL | re.IGNORECASE)
         
         if svg_match:
             combined_svg = svg_match.group(0)
-            logger.info("AI successfully combined SVGs (direct)")
+            logger.info("AI successfully combined SVGs (pattern match)")
+            return combined_svg
+        
+        # If response contains SVG tag but pattern failed, try extracting everything between first <svg and last </svg>
+        svg_start = ai_response.find('<svg')
+        svg_end = ai_response.rfind('</svg>')
+        if svg_start != -1 and svg_end != -1 and svg_end > svg_start:
+            combined_svg = ai_response[svg_start:svg_end + 6].strip()
+            logger.info("AI successfully combined SVGs (manual extraction)")
             return combined_svg
         
         # If no SVG found, log the response for debugging
         logger.warning(f"Could not extract SVG from AI response. Response preview: {ai_response[:200]}...")
+        logger.info("Using fallback SVG combination method")
         return simple_combine_svgs_fallback(text_svg_code, traced_svg_code)
             
     except Exception as e:
