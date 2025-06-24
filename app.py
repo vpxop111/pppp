@@ -1596,14 +1596,30 @@ Create a single, perfectly combined SVG that merges both elements beautifully.""
 
         ai_response = response_data["choices"][0]["message"]["content"]
         
+        # Log the response for debugging
+        logger.info(f"AI response length: {len(ai_response)}")
+        logger.info(f"AI response starts with: {repr(ai_response[:50])}")
+        
+        # Clean the response
+        ai_response_clean = ai_response.strip()
+        
         # Extract SVG code from the response - improved pattern matching
         # First check if the response starts with SVG directly (most common case)
-        if ai_response.strip().startswith('<svg'):
+        if ai_response_clean.startswith('<svg'):
             # Find the end of the SVG
             svg_end = ai_response.rfind('</svg>') + 6
             if svg_end > 5:  # Found closing tag
                 combined_svg = ai_response[:svg_end].strip()
                 logger.info("AI successfully combined SVGs (direct start)")
+                return combined_svg
+        
+        # If response is mostly SVG content, return it directly
+        if '<svg' in ai_response_clean and '</svg>' in ai_response_clean:
+            svg_start = ai_response_clean.find('<svg')
+            svg_end = ai_response_clean.rfind('</svg>') + 6
+            if svg_start != -1 and svg_end > svg_start:
+                combined_svg = ai_response_clean[svg_start:svg_end]
+                logger.info("AI successfully combined SVGs (direct extraction)")
                 return combined_svg
         
         # Try to find SVG within code blocks
