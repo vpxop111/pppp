@@ -1550,23 +1550,17 @@ Guidelines:
 - Apply subtle opacity adjustments if needed for text readability
 - Ensure the combined result looks professional and cohesive
 
-CRITICAL: Return ONLY the complete SVG code starting with <svg and ending with </svg>. 
-Do not include any explanations, comments, or markdown formatting. 
-The response must be valid SVG code that can be directly used."""
+ABSOLUTELY CRITICAL: Your response must contain ONLY the complete SVG code. Start immediately with <svg and end with </svg>. Do not include any explanations, comments, markdown formatting, or any other text whatsoever. The response must be purely valid SVG code that can be directly used without any processing."""
 
-    user_prompt = f"""Please combine these two SVGs intelligently:
+    user_prompt = f"""Combine these two SVGs intelligently:
 
 TEXT SVG (contains text elements):
-```svg
 {text_svg_code}
-```
 
 BACKGROUND/TRACED SVG (contains graphics/shapes):
-```svg
 {traced_svg_code}
-```
 
-Create a single, perfectly combined SVG that merges both elements beautifully."""
+Return only the combined SVG code."""
 
     payload = {
         "model": "gpt-4.1-nano",
@@ -1600,58 +1594,10 @@ Create a single, perfectly combined SVG that merges both elements beautifully.""
         logger.info(f"AI response length: {len(ai_response)}")
         logger.info(f"AI response starts with: {repr(ai_response[:50])}")
         
-        # Clean the response
-        ai_response_clean = ai_response.strip()
-        
-        # Extract SVG code from the response - improved pattern matching
-        # First check if the response starts with SVG directly (most common case)
-        if ai_response_clean.startswith('<svg'):
-            # Find the end of the SVG
-            svg_end = ai_response.rfind('</svg>') + 6
-            if svg_end > 5:  # Found closing tag
-                combined_svg = ai_response[:svg_end].strip()
-                logger.info("AI successfully combined SVGs (direct start)")
-                return combined_svg
-        
-        # If response is mostly SVG content, return it directly
-        if '<svg' in ai_response_clean and '</svg>' in ai_response_clean:
-            svg_start = ai_response_clean.find('<svg')
-            svg_end = ai_response_clean.rfind('</svg>') + 6
-            if svg_start != -1 and svg_end > svg_start:
-                combined_svg = ai_response_clean[svg_start:svg_end]
-                logger.info("AI successfully combined SVGs (direct extraction)")
-                return combined_svg
-        
-        # Try to find SVG within code blocks
-        code_block_pattern = r'```(?:svg)?\s*(<svg.*?</svg>)\s*```'
-        code_block_match = re.search(code_block_pattern, ai_response, re.DOTALL | re.IGNORECASE)
-        
-        if code_block_match:
-            combined_svg = code_block_match.group(1)
-            logger.info("AI successfully combined SVGs (from code block)")
-            return combined_svg
-        
-        # Try direct SVG pattern with more flexible matching
-        svg_pattern = r'<svg[^>]*>.*?</svg>'
-        svg_match = re.search(svg_pattern, ai_response, re.DOTALL | re.IGNORECASE)
-        
-        if svg_match:
-            combined_svg = svg_match.group(0)
-            logger.info("AI successfully combined SVGs (pattern match)")
-            return combined_svg
-        
-        # If response contains SVG tag but pattern failed, try extracting everything between first <svg and last </svg>
-        svg_start = ai_response.find('<svg')
-        svg_end = ai_response.rfind('</svg>')
-        if svg_start != -1 and svg_end != -1 and svg_end > svg_start:
-            combined_svg = ai_response[svg_start:svg_end + 6].strip()
-            logger.info("AI successfully combined SVGs (manual extraction)")
-            return combined_svg
-        
-        # If no SVG found, log the response for debugging
-        logger.warning(f"Could not extract SVG from AI response. Response preview: {ai_response[:200]}...")
-        logger.info("Using fallback SVG combination method")
-        return simple_combine_svgs_fallback(text_svg_code, traced_svg_code)
+        # Return the AI response directly without any extraction logic
+        combined_svg = ai_response.strip()
+        logger.info("AI successfully combined SVGs - returning direct response")
+        return combined_svg
             
     except Exception as e:
         logger.error(f"Error in AI SVG combination: {str(e)}")
