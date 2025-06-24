@@ -1560,7 +1560,7 @@ TEXT SVG (contains text elements):
 BACKGROUND/TRACED SVG (contains graphics/shapes):
 {traced_svg_code}
 
-Return only the combined SVG code."""
+Return only the combined SVG code. must you return full svg code"""
 
     payload = {
         "model": "gpt-4.1-nano",
@@ -1574,8 +1574,8 @@ Return only the combined SVG code."""
                 "content": user_prompt
             }
         ],
-        "temperature": 0.3,
-        "max_tokens": 8000
+        "temperature": 1,
+        "max_tokens": 20000
     }
 
     try:
