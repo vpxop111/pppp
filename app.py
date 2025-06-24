@@ -160,38 +160,44 @@ def plan_design(user_input):
         "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
     }
 
-    # Use simplified, practical planning approach focused on concrete specifications
-    system_content = """You are a practical design planner. Create a clear, actionable plan for the design request that focuses on specific, implementable details.
+    # Use simplified, practical planning approach focused on PERFECT CENTRALIZATION
+    system_content = """You are a practical design planner specializing in PERFECTLY CENTERED layouts. Create a clear, actionable plan for the design request that ensures ALL elements are perfectly centered.
+
+CRITICAL REQUIREMENT: ALL DESIGNS MUST BE PERFECTLY CENTERED - Every element must be centrally aligned both horizontally and vertically.
 
 Your plan should include:
-1. Layout Structure
-   - Overall composition (centered, asymmetrical, grid-based)
-   - Key elements placement and sizing
-   - Visual hierarchy and focal points
+1. CENTERED Layout Structure
+   - Overall composition: PERFECTLY CENTERED approach (all elements centered)
+   - Key elements placement: ALL CENTERED and symmetrically positioned
+   - Visual hierarchy: CENTERED focal points with balanced distribution
+   - Symmetrical design with perfect center alignment
 
-2. Typography Specifications
-   - Specific font recommendations (Google Fonts preferred)
-   - Font sizes and weights for different text elements
-   - Text alignment and spacing
+2. CENTERED Typography Specifications
+   - Specific font recommendations (Google Fonts preferred) - ALL TEXT CENTERED
+   - Font sizes and weights for different text elements - ALL CENTERED
+   - Text alignment: PERFECT CENTER ALIGNMENT for all text
+   - Spacing: Symmetrical spacing around centered elements
 
-3. Color Scheme
-   - Primary background color
-   - Text colors for readability
-   - Accent colors for highlights
+3. Color Scheme for Centered Design
+   - Primary background color that enhances centered content
+   - Text colors for readability with centered alignment
+   - Accent colors for highlights that support center focus
    - Specific hex codes when possible
 
-4. Content Elements
-   - Main heading/title treatment
-   - Secondary text placement
-   - Decorative elements (borders, shapes, icons)
-   - Brand elements if applicable
+4. CENTERED Content Elements
+   - Main heading/title: PERFECTLY CENTERED treatment
+   - Secondary text: CENTERED placement below main title
+   - Decorative elements: SYMMETRICALLY PLACED around center
+   - Brand elements: CENTERED if applicable
+   - All content arranged in perfect center alignment
 
-5. Technical Requirements
-   - Dimensions and aspect ratio
-   - File format considerations
-   - Quality standards for output
+5. Technical Requirements for Centered Design
+   - Dimensions and aspect ratio optimized for center alignment
+   - SVG viewBox centered at 0 0 1080 1080
+   - Quality standards ensuring crisp centered output
+   - Perfect center positioning coordinates
 
-Focus on creating a practical, implementable plan with specific details that can be directly used for design creation."""
+Focus on creating a practical, implementable plan where EVERYTHING is perfectly centered - no element should be off-center."""
 
     payload = {
         "model": PLANNER_MODEL,
@@ -228,42 +234,48 @@ def generate_design_knowledge(design_plan, user_input):
         "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
     }
 
-    # Use practical, actionable design knowledge approach
-    system_content = """You are a practical design knowledge expert. Provide specific, actionable design insights and best practices that can be directly implemented.
+    # Use practical, actionable design knowledge approach focused on PERFECT CENTRALIZATION
+    system_content = """You are a practical design knowledge expert specializing in PERFECTLY CENTERED designs. Provide specific, actionable design insights and best practices for creating perfectly centered layouts.
+
+CRITICAL FOCUS: ALL advice must emphasize PERFECT CENTER ALIGNMENT - every element must be perfectly centered.
 
 Provide practical knowledge for:
 
-1. Typography Best Practices
-   - Recommended font combinations that work well together
-   - Optimal font sizes for different screen sizes and readability
-   - Proper line spacing and letter spacing guidelines
-   - Font loading and fallback strategies
+1. CENTERED Typography Best Practices
+   - Recommended font combinations that work well together when PERFECTLY CENTERED
+   - Optimal font sizes for different screen sizes with CENTER ALIGNMENT
+   - Proper line spacing and letter spacing for CENTERED text
+   - Font loading and fallback strategies for CENTERED layouts
+   - Center text alignment techniques and positioning
 
-2. Color Theory Application
-   - Proven color combinations with hex codes
-   - Contrast ratios for accessibility compliance
-   - Background and text color pairings
-   - Brand-appropriate color choices
+2. Color Theory for CENTERED Designs
+   - Proven color combinations with hex codes that enhance CENTERED content
+   - Contrast ratios for accessibility compliance in CENTERED layouts
+   - Background and text color pairings that support CENTER FOCUS
+   - Brand-appropriate color choices for PERFECTLY CENTERED designs
 
-3. Layout and Composition
-   - Grid systems and alignment principles
-   - White space utilization for clarity
-   - Visual hierarchy techniques
-   - Responsive design considerations
+3. CENTERED Layout and Composition
+   - CENTER ALIGNMENT principles - everything must be centered
+   - Symmetrical grid systems for PERFECT CENTER ALIGNMENT
+   - White space utilization around CENTERED content for clarity
+   - Visual hierarchy techniques with CENTERED focal points
+   - CENTERED responsive design considerations
 
-4. Technical Implementation
-   - SVG optimization techniques
-   - File size management
-   - Cross-browser compatibility
-   - Performance optimization tips
+4. Technical Implementation for CENTERED SVGs
+   - SVG center positioning techniques (x="50%", text-anchor="middle")
+   - Perfect center coordinates calculation (540, 540 for 1080x1080)
+   - CENTER ALIGNMENT optimization techniques
+   - Cross-browser compatibility for CENTERED elements
+   - Performance optimization for CENTERED layouts
 
-5. Quality Assurance
-   - Design consistency checkpoints
-   - Accessibility standards
-   - User experience considerations
-   - Testing and validation methods
+5. CENTERED Design Quality Assurance
+   - CENTER ALIGNMENT consistency checkpoints
+   - Verification that ALL elements are perfectly centered
+   - Accessibility standards for CENTERED content
+   - User experience considerations for CENTERED designs
+   - Testing and validation for PERFECT CENTER ALIGNMENT
 
-Focus on providing concrete, implementable advice that will directly improve design quality and user experience."""
+Focus on providing concrete, implementable advice that ensures PERFECT CENTER ALIGNMENT and directly improves centered design quality."""
 
     payload = {
         "model": DESIGN_KNOWLEDGE_MODEL,
@@ -307,40 +319,41 @@ def pre_enhance_prompt(user_input):
                 "role": "system",
                 "content": """You are a assistant you are a prompt enhancer your task is to take input from user like "create coming soon poster for clothing company" or "create testimonial for a restaurant" you need to convert this prompt into detailed examples given below. You must modify prompt according to prompt given by user. you must make sure color and font should same as given by user if not given kindly use it on your own while keeping design principles and fundamentals in your mind.
 
+CRITICAL REQUIREMENT: ALL DESIGNS MUST BE PERFECTLY CENTERED - Every element, text, image, and component must be centrally aligned both horizontally and vertically. The entire composition must follow a centered approach.
+
 Don't add custom elements, shapes, and random figures in prompts.
 You must generate a prompt same as given below examples
 
 
-Examples for Coming Soon Pages: -
+Examples for Coming Soon Pages (ALL CENTERED): -
 
-- Design a clean and elegant coming soon page with a black rectangular border, centered "Coming Soon" text in a cursive font, and a white background using Water Brush font at 60px size.
-- Design a modern coming soon page with a sleek black background, a prominent complex SVG graphic, centered layout, minimalist text, and seamless integration of decorative SVG elements.
-- Design a stylish coming soon page with a soft pink background, golden brown border, cursive "something" in Allura font, and main text in Times New Roman font with heart symbols and website link.
-- Create a coming soon page with a light beige background, dark gray content area featuring large white text for "COMING SOON," a website URL, and a - "GRAND OPENING" button styled in green with custom fonts.
-- Design a natural-themed coming soon page with a dark green background, featuring Bebas Neue font in large size for "Coming" and "soon," a countdown section, and an angled exclamation mark graphic in the bottom right corner.
-- Design a coming soon page with a deep blue background, featuring centrally positioned text in Tektur font (white for 'COMING' with shadow, orange for 'SOON' with shadow), and white lines for definition, all slightly rotated.
-- Design a warm and welcoming coming soon page with a beige background, centered layout, modern font for the title, cursive and bold fonts for 'Coming Soon,' and simple font for a website link, including decorative SVG elements.
-- Design a warm and inviting coming soon page with a light beige background, bold 'COMING SOON' text in a darker brown color, and a date below in 'Open Sans' font.
-- Design a playful coming soon page with a cream background, grid pattern, bold text in warm taupe, cursive text in dark green, and sans-serif font for additional information, ensuring a centered layout for clarity and appeal.
-- Design an elegant coming soon page with beige background, featuring 'LARANA STORE' in bold serif font, 'BEAUTY PRODUCT' in a decorative rectangle, and 'COMING SOON' in red and cursive font, with 'STAY TUNED' and '@REALLYGREATSITE' included, along with whimsical star shapes for a playful touch.
-- Design a bold and modern coming soon page with black background, gray border, large Bebas Neue text for "COMING" and "SOON," decorative Allura font for "-Best Store-" and "Stay Tuned," and a date of 12.12.2025, with clear website link at the bottom.
-- Design a clean coming soon page with a white background, a beige box with a grey border, 'LICERIA & CO.' at the top in large dark blue-grey text, 'WE ARE' below in smaller text, 'OPEN' centered, and 'OPENING HOURS' with hours displayed below.
-- Design a modern and minimalistic coming soon page with a clean white background, featuring centered text in Open Sans font and time indicators styled in dark gray.
-- Design a coming soon page with centered text elements in black color on a soft pink background, featuring the phrases 'NOW WE ARE', 'OPEN', and 'VISIT OUR SITE' with specific font styles and sizes. Include a website link at the bottom in a regular font.
+- Design a clean and elegant coming soon page with a black rectangular border, PERFECTLY CENTERED "Coming Soon" text in a cursive font, and a white background using Water Brush font at 60px size, with all elements centrally aligned.
+- Design a modern coming soon page with a sleek black background, a prominent complex SVG graphic CENTERED, centralized layout, minimalist text CENTERED, and seamless integration of decorative SVG elements all perfectly centered.
+- Design a stylish coming soon page with a soft pink background, golden brown border, cursive "something" in Allura font CENTERED, and main text in Times New Roman font CENTERED with heart symbols and website link all centrally positioned.
+- Create a coming soon page with a light beige background, dark gray content area featuring large white text for "COMING SOON" PERFECTLY CENTERED, a website URL CENTERED, and a "GRAND OPENING" button styled in green with custom fonts CENTRALLY PLACED.
+- Design a natural-themed coming soon page with a dark green background, featuring Bebas Neue font in large size for "Coming" and "soon" PERFECTLY CENTERED, a countdown section CENTERED, and decorative elements positioned symmetrically around the center.
+- Design a coming soon page with a deep blue background, featuring PERFECTLY CENTERED text in Tektur font (white for 'COMING' with shadow, orange for 'SOON' with shadow), and white lines for definition, all elements perfectly aligned to center.
+- Design a warm and welcoming coming soon page with a beige background, PERFECTLY CENTERED layout, modern font for the title CENTERED, cursive and bold fonts for 'Coming Soon' CENTERED, and simple font for a website link CENTERED, including decorative SVG elements symmetrically placed around center.
+- Design a warm and inviting coming soon page with a light beige background, bold 'COMING SOON' text PERFECTLY CENTERED in a darker brown color, and a date below CENTERED in 'Open Sans' font.
+- Design a playful coming soon page with a cream background, grid pattern, bold text in warm taupe CENTERED, cursive text in dark green CENTERED, and sans-serif font for additional information CENTERED, ensuring a PERFECTLY CENTERED layout for clarity and appeal.
+- Design an elegant coming soon page with beige background, featuring 'LARANA STORE' PERFECTLY CENTERED in bold serif font, 'BEAUTY PRODUCT' in a decorative rectangle CENTERED, and 'COMING SOON' in red and cursive font CENTERED, with 'STAY TUNED' and '@REALLYGREATSITE' CENTERED, along with whimsical star shapes symmetrically placed around the center.
+- Design a bold and modern coming soon page with black background, gray border, large Bebas Neue text for "COMING" and "SOON" PERFECTLY CENTERED, decorative Allura font for "-Best Store-" and "Stay Tuned" CENTERED, and a date CENTERED, with clear website link CENTERED at the bottom.
+- Design a clean coming soon page with a white background, a beige box with a grey border CENTERED, 'LICERIA & CO.' at the top CENTERED in large dark blue-grey text, 'WE ARE' below CENTERED in smaller text, 'OPEN' PERFECTLY CENTERED, and 'OPENING HOURS' with hours displayed CENTERED below.
+- Design a modern and minimalistic coming soon page with a clean white background, featuring PERFECTLY CENTERED text in Open Sans font and time indicators styled in dark gray, all elements centrally aligned.
+- Design a coming soon page with PERFECTLY CENTERED text elements in black color on a soft pink background, featuring the phrases 'NOW WE ARE', 'OPEN', and 'VISIT OUR SITE' with specific font styles and sizes ALL CENTERED. Include a website link at the bottom CENTERED in a regular font.
 
-Examples for Testimonial Designs: -
+Examples for Testimonial Designs (ALL CENTERED): -
 
-
-- Design a testimonial graphic with a teal background, featuring a beige square container with "TESTIMONIAL" in bold Alfarn font, three orange circles below, PT Serif font for customer experience lines, and square quotation marks for visual appeal.,
-- Design a testimonial with a white background, a large pink circle in the center, testimonial text in Raleway font, customer's name at the bottom, and decorative elements like 4-spoke stars and a dotted circle.,
-- Create a testimonial with a cream background, black quotation marks, centered title "Testimonial," testimonial text "We couldn't be happier with the outstanding service provided by Weblake Company...," author name "- Linda Brown -" centered below, and website URL "a.barnescopy.site.com" at the bottom in Instrument Serif font.,
-- Design a testimonial with a neon green header, black background, and round corner speech box, featuring the title "CLIENT TESTIMONIAL" in Bebas Neue font at 80px, testimonial text in Neue font at 42px, and name "MIHIR GEHLOT" in Raleway font at 36px, all centered and styled accordingly.,
-- Design a testimonial with a blue background and a light blue header, featuring a bold "Testimonial" title in orange Abril Fatface font, followed by a warm message in Raleway font within a white speech box with rounded corners. Include the website URL in PT Serif font at the bottom.,
-- Design a testimonial with yellow background, a central white text box with dotted border, Lato font for main message, Montserrat font for name "Olivia Wilson," and a blue underline, without an image.,
-- Create a testimonial with a mint green background, featuring a bold red "CLIENT FEEDBACK" title at the top, a white rounded rectangle for the testimonial text, and include the customer name "OLIVIA WILSON" with five blue stars for a 5-star rating.,
-- Design a testimonial with a centered title "CLIENT REVIEWS" in bold Courier Std font, italic Coromont Garamond text in a dark gray container, and five gold stars for rating, all on a clean white background.,
-- Design a testimonial with Viaboda Libre title and Playfair Display font for positive feedback by "Rakhi Sawant," with left and right quote SVGs on a pale yellow background.,
-- Design a testimonial with a blue background and a light blue header, featuring a bold "Testimonial" title in orange Abril Fatface font, followed by a warm message in Raleway font within a white speech box with rounded corners. Include the website URL in PT Serif font at the bottom.,
+- Design a testimonial graphic with a teal background, featuring a beige square container PERFECTLY CENTERED with "TESTIMONIAL" in bold Alfarn font CENTERED, three orange circles below CENTERED, PT Serif font for customer experience lines CENTERED, and square quotation marks CENTERED for visual appeal.
+- Design a testimonial with a white background, a large pink circle PERFECTLY CENTERED, testimonial text in Raleway font CENTERED, customer's name at the bottom CENTERED, and decorative elements like 4-spoke stars and a dotted circle symmetrically placed around center.
+- Create a testimonial with a cream background, black quotation marks CENTERED, PERFECTLY CENTERED title "Testimonial," testimonial text "We couldn't be happier with the outstanding service provided by Weblake Company..." CENTERED, author name "- Linda Brown -" PERFECTLY CENTERED below, and website URL CENTERED at the bottom in Instrument Serif font.
+- Design a testimonial with a neon green header CENTERED, black background, and round corner speech box CENTERED, featuring the title "CLIENT TESTIMONIAL" in Bebas Neue font at 80px PERFECTLY CENTERED, testimonial text in Neue font at 42px CENTERED, and name "MIHIR GEHLOT" in Raleway font at 36px CENTERED, all elements perfectly aligned to center.
+- Design a testimonial with a blue background and a light blue header CENTERED, featuring a bold "Testimonial" title in orange Abril Fatface font PERFECTLY CENTERED, followed by a warm message in Raleway font within a white speech box with rounded corners CENTERED. Include the website URL in PT Serif font CENTERED at the bottom.
+- Design a testimonial with yellow background, a PERFECTLY CENTERED white text box with dotted border, Lato font for main message CENTERED, Montserrat font for name "Olivia Wilson" CENTERED, and a blue underline CENTERED, without an image.
+- Create a testimonial with a mint green background, featuring a bold red "CLIENT FEEDBACK" title PERFECTLY CENTERED at the top, a white rounded rectangle CENTERED for the testimonial text, and include the customer name "OLIVIA WILSON" CENTERED with five blue stars CENTERED for a 5-star rating.
+- Design a testimonial with a PERFECTLY CENTERED title "CLIENT REVIEWS" in bold Courier Std font, italic Coromont Garamond text in a dark gray container CENTERED, and five gold stars for rating CENTERED, all on a clean white background.
+- Design a testimonial with Viaboda Libre title PERFECTLY CENTERED and Playfair Display font for positive feedback by "Rakhi Sawant" CENTERED, with left and right quote SVGs symmetrically placed around the centered content on a pale yellow background.
+- Design a testimonial with a blue background and a light blue header CENTERED, featuring a bold "Testimonial" title in orange Abril Fatface font PERFECTLY CENTERED, followed by a warm message in Raleway font within a white speech box with rounded corners CENTERED. Include the website URL in PT Serif font CENTERED at the bottom.
 """
             },
             {
@@ -382,21 +395,24 @@ def enhance_prompt_with_chat(user_input):
                 "content": """You are a prompt enhancer assistant. You transform simple, brief prompts into detailed,
                 comprehensive prompts that provide specific details, requirements, and context to help generate better results.
                 
+                CRITICAL CENTRALIZATION REQUIREMENT: ALL DESIGNS MUST BE PERFECTLY CENTERED. Every single element must be centrally aligned both horizontally and vertically.
+                
                 For both coming soon pages and testimonial designs, ensure you include specific details about:
-                - Layout and positioning
-                - Font choices, sizes, and styles
+                - Layout and positioning (ALL CENTERED)
+                - Font choices, sizes, and styles (ALL CENTERED)
                 - Color schemes and background designs
-                - Decorative elements and their placement
-                - Text content and hierarchy
-                - Spacing and alignment
+                - Decorative elements and their placement (SYMMETRICALLY CENTERED)
+                - Text content and hierarchy (ALL CENTERED)
+                - Spacing and alignment (PERFECT CENTER ALIGNMENT)
 
                 
                 Add these requirements at the end of each prompt:
-                'Compulsory in you use create good svg code must meaningfull and good and also usable for user ok msut look good'
-                'Compulsory in you use any color must make sense and text color and and all continer bg color must visible togther'
-                'Compulsory in This must you make all svg code must be center align in good aligmnet'
-                'Compulsory IN THIS FETCH FONT USING LINK AND FONT FACE BOTH
-                'Compulsory IN THIS ALIGMENT MUST BE GOOD AND GOOD LOOKING"
+                'Compulsory: ALL content must be PERFECTLY CENTERED - every text, image, shape, and element must be centrally aligned both horizontally and vertically'
+                'Compulsory: Create good svg code that is meaningful, good, and also usable for user - must look good with PERFECT CENTER ALIGNMENT'
+                'Compulsory: Use colors that make sense and text color and all container bg colors must be visible together'
+                'Compulsory: ALL SVG code must be PERFECTLY CENTER ALIGNED with excellent alignment - no element should be off-center'
+                'Compulsory: Fetch fonts using both LINK and FONT FACE methods'
+                'Compulsory: Alignment must be PERFECT CENTER ALIGNMENT and good looking - everything centered'
                 '"""
             },
             {
@@ -468,13 +484,30 @@ Your enhanced prompts should focus on:
 6. CREDIBILITY INDICATORS: Stars, badges, professional photos, company logos
 7. TECHNICAL SPECS: 1024x1024, high readability, clean composition
 
+EXAMPLE TESTIMONIAL PROMPTS FROM TRAINING DATA:
+
+Example 1: "Create a testimonial with a teal background featuring a beige square container at the center. The layout includes a large bold 'TESTIMONIAL' text at the top, styled with the Alfarn font, placed in the middle of the container. Below, there are three decorative circles in orange arranged horizontally, adding a playful touch. The body text, written in PT Serif font, is centered and displays a series of lines about customer experience, ensuring a clear and engaging read. Finally, include square quotation marks on either side of the testimonial text to enhance the visual appeal and authenticity. **Image:** No image **Fonts:** Alfarn, PT Serif, Aileron **Custom Elements:** Square quotation marks *2"
+
+Example 2: "Create a testimonial with a white background featuring a large pink circle at the center. The layout includes testimonial text placed centrally with multiple lines, and the customer's name at the bottom. Decoratively, there are four 4-spoke stars located in each corner of the design and a dotted circle element subtly integrated around the testimonial. The text is styled using the Raleway font, with the testimonial text in a size of 42, and the customer's name in a larger size of 48, both in black and dark blue respectively. The design maintains a clean, professional appearance suitable for showcasing customer feedback. **Image:** No image **Fonts:** Raleway **Custom Elements:** 4 spoke star *4, dotted circle"
+
+Example 3: "Create a testimonial with a vibrant green background, featuring a large dashed border square that is softly rounded at the corners. Inside the square, use bold Arvo font in a rich reddish-brown color for the title 'What They Say!' positioned at the top center. Below the title, add a testimonial text in Raleway font, styled in dark gray, conveying a positive review about customer service and quality furnishings. At the bottom of the square, include the name 'Cezzane Ali' in a slightly larger size of Raleway font, colored in the same reddish-brown as the title. Decorate the layout with six small circular dots in a warm peach color, positioned above and below the testimonial text, and include a subtle grid pattern in the background for added depth. **Custom Elements:** Dotted rounded corner square, Circular dots (6), Grid pattern made up of line squares on the right **Fonts:** Arvo, Raleway **Image:** No image"
+
+Example 4: "Create a testimonial with a deep navy blue background (#2C3E50) adorned with vibrant coral accents (#FF7F50) for the text and decorative elements, featuring a centered layout that includes a prominent title 'PROFESSIONAL BUSINESS' in bold white (#F5F5DC) and a subtitle 'Testimonials' in coral. The design includes two testimonials, each with a circular user icon and decorative quotation marks. The first testimonial showcases Victoria Wotton, an Entrepreneur, with an italicized quote stating, 'takes care of everything that you need to build an unshakable and brand in this new world.' The second testimonial features Matthew Smith, also an Entrepreneur, sharing his experience with the quote, 'Innovative and unique work. me continuous learning.' **Custom Elements:** Circular quotation marks (4), Rectangle speech boxes (2) **Fonts:** Montserrat (used for titles, names, and testimonial text) **Image:** No image"
+
+Example 5: "Create a testimonial with a light beige background (#E5E0DB) adorned with playful sparkles in orange (#FFA726), featuring a prominent title reading 'CUSTOMER TESTIMONIAL' in Bebas Neue font at the top. Use Aileron font for the customer's name 'Nelly Dean' in a bold style, followed by a star rating represented by five golden stars (#827717) beneath the name. The review text should be styled in Aileron font, conveying a positive message with phrases like 'Awesome! This's very good product with affordable price. Good Job! Thank You.' Below, incorporate a wavy green shape (#556B2F) at the bottom of the image, and include a phone mockup with makeup tools and small stars' icons displayed on the screen. Finally, add the email address 'WWW.ORGANICSERUM@GMAIL.COM' in Amatic SC font, centered at the bottom in white. **Custom Elements:** ['4 spoke star * 1', '4 spoke small star * 2', 'Green color wavy icon on the bottom', 'makeup tools with small stars' icon'] **Fonts:** ['Bebas Neue', 'Aileron', 'Amatic SC'] **Image:** ['phone in hand']"
+
+Example 6: "Create a testimonial with a white background featuring a subtle diamond pattern in light grey, a rounded rectangular header box in deep navy blue (#152238) with bold white text stating 'CLIENT TESTIMONIAL', and a vibrant orange main content box (#F39C12) below. The testimonial should include a star rating displayed with five white stars, four fully filled and one partially filled, along with the testimonial text saying 'Stylish and well-crafted furniture adding elegance to any living space.' in elegant white font. Below the text, include the client name 'Robert William' along with a decorative line underneath. At the bottom, feature a rounded rectangular bar in orange with the text 'AMAZON' in bold white and a smaller text for the website 'Visit our website www.flyfurniture@gmail.com'. **Custom Elements:** 5 spoke stars (5), small lines (1), line (1) **Fonts:** Poppins (used for headers, testimonials, and client names) **Image:** No image"
+
+Example 7: "Create a testimonial with a soft pink background (#D8A1C4) and a central cream area (#FFF1E6), featuring a bold title in Raleway font in coral (#FF7F50) reading 'CLIENT' and 'TESTIMONIALS'. The layout includes decorative half circles in coral at the sides, and a circular user photo area at the center. The testimonial text, styled in Poppins font, is presented within a rectangular frame with rounded corners, filled with no color and outlined in coral, highlighting a heartfelt review: 'Thanks to this product, I feel more confident and radiant than ever, and I am excited to continue using this amazing product in my facial care routine. Thank you for creating something so wonderful and transformative!' The review is concluded with a star rating in a deep blue (#4169E1) and signed by 'Jones Williams' in an italicized Raleway font. **Custom Elements:** ['5 spoke star *5', 'Hemisphere *2', 'Rectangular frame around body text'] **Fonts:** ['Raleway', 'Poppins'] **Image:** ['custome image']"
+
 Enhancement Guidelines:
-- Use words like "professional", "trustworthy", "credible", "polished", "authentic"
-- Specify clean, readable typography with proper hierarchy
-- Include trust-building visual elements (5-star ratings, checkmarks, badges)
-- Add professional color schemes with hex codes
-- Specify background treatments (gradient, texture, clean)
-- Include layout details (centered quotes, side attribution, balanced composition)
+- Use descriptive, specific language like the examples above
+- Include exact color codes (#RRGGBB format)
+- Specify font names and sizes precisely
+- Detail custom decorative elements (stars, shapes, icons)
+- Describe layout structure and positioning
+- Include background treatments and visual effects
+- Follow the format: detailed description + **Custom Elements:** + **Fonts:** + **Image:**
 
 Return ONLY the enhanced prompt optimized for GPT Image-1, no explanations."""
 
@@ -509,11 +542,22 @@ Your enhanced prompts should focus on:
 5. TECHNICAL QUALITY: 1024x1024, high resolution, crisp details
 6. PURPOSE: Design that serves its intended function effectively
 
+EXAMPLE ENHANCED PROMPTS FROM TRAINING DATA:
+
+Example 1: "Create a vibrant testimonial with a dark teal background and golden sun rays on the sides, featuring elegant white text in Josefin Sans font and bold Bebas Neue font at the bottom. The rich dark teal background (#004B49) is adorned with decorative sun rays in golden yellow (#DAA520) on both left and right sides, creating a vibrant and uplifting atmosphere."
+
+Example 2: "Create a modern coming soon poster with a sleek black background (#000000) and a soft light gray content area (#F5F5F5), featuring a bold title in Alegreya font that reads 'COMING SOON' prominently at the top. Include dramatic lighting effects with neon glow accents and metallic texture details."
+
+Example 3: "Create a testimonial with a soft beige background (#F5E6E0) adorned with decorative concentric circles in the top right and bottom left corners, a centered title reading 'CLIENT REVIEW' in bold Philosopher font, featuring a detailed review styled with Lato font for the review text, and a star rating illustrated with 5 brown stars (#8B4513)."
+
 Enhancement Guidelines:
-- Use descriptive, specific language for visual elements
+- Use descriptive, specific language like the examples above
+- Include exact color codes (#RRGGBB format) when possible
+- Specify font names, sizes, and visual effects precisely
+- Detail layout structure, positioning, and decorative elements
 - Include technical specifications for optimal GPT Image-1 output
-- Specify colors, fonts, layouts, and effects in detail
-- Focus on professional, high-quality results
+- Describe background treatments, lighting effects, and textures
+- Focus on professional, high-quality results with specific visual details
 
 Return ONLY the enhanced prompt optimized for GPT Image-1, no explanations."""
 
@@ -1214,8 +1258,8 @@ def chat_assistant():
         return jsonify({"error": error_msg}), 500
 
 def build_advanced_image_prompt(user_input, design_context):
-    """Build an advanced image prompt optimized for creating stunning visuals"""
-    logger.info(f"Building advanced image prompt: {user_input[:100]}...")
+    """Build an advanced image prompt optimized for creating PERFECTLY CENTERED stunning visuals"""
+    logger.info(f"Building advanced CENTERED image prompt: {user_input[:100]}...")
     
     url = OPENAI_CHAT_ENDPOINT
     headers = {
@@ -1223,85 +1267,42 @@ def build_advanced_image_prompt(user_input, design_context):
         "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
     }
 
-    # Detect design type for specialized prompt building
-    user_lower = user_input.lower()
-    is_coming_soon = any(word in user_lower for word in ['coming soon', 'coming', 'soon', 'announcement', 'launch'])
-    is_testimonial = any(word in user_lower for word in ['testimonial', 'review', 'quote', 'feedback'])
+    # Use unified centered approach for all designs
+    system_content = """You are an expert at creating FINAL image generation prompts that produce PERFECTLY CENTERED visuals. Take the enhanced prompt and design context to create the ultimate prompt for GPT Image-1 that will generate stunning designs with PERFECT CENTER ALIGNMENT.
 
-    if is_coming_soon:
-        system_content = """You are an expert at creating FINAL image generation prompts that produce VIRAL "Coming Soon" visuals. Take the enhanced prompt and design context to create the ultimate prompt for GPT Image-1 that will generate mind-blowing coming soon designs.
+CRITICAL REQUIREMENT: ALL ELEMENTS MUST BE PERFECTLY CENTERED - Every text, image, shape, and component must be centrally aligned both horizontally and vertically.
 
 Your final prompt must be optimized for:
 
-1. MAXIMUM VISUAL IMPACT
-   - Explosive composition that stops scrolling
-   - Dramatic lighting and effects that create wow factor
-   - Typography that commands immediate attention
-   - Color combinations that create emotional excitement
+1. PERFECT CENTER ALIGNMENT
+   - ALL elements PERFECTLY CENTERED both horizontally and vertically
+   - Symmetrical composition with center focal point
+   - CENTERED typography that commands attention
+   - Balanced layout with everything aligned to center
+   - NO off-center elements whatsoever
 
-2. GPT IMAGE-1 OPTIMIZATION
-   - Clear, specific visual descriptions for accurate generation
-   - Technical specifications for crisp 1024x1024 output
-   - Element separation for clean generation
-   - Prompt structure that maximizes generation quality
+2. GPT IMAGE-1 OPTIMIZATION FOR CENTERED DESIGNS
+   - Clear specifications for CENTERED element generation
+   - Technical specifications for crisp 1024x1024 output with CENTER alignment
+   - CENTERED element separation for clean generation
+   - Prompt structure that maximizes CENTERED generation quality
+   - CENTER positioning instructions for all components
 
-3. COMING SOON SPECIALIZATION
-   - Language that triggers excitement and anticipation
-   - Visual elements that create buzz and shareability
-   - Design elements that scream "premium" and "exclusive"
-   - Composition that works perfectly for social media sharing
+3. CENTERED VISUAL EXCELLENCE
+   - Professional CENTERED composition that captures attention
+   - CENTERED typography and layout that serves the design purpose
+   - Color schemes that enhance CENTERED content
+   - Visual hierarchy with CENTERED focal points
+   - Symmetrical design elements around the center
 
-Create a final prompt that will generate a coming soon image that goes viral."""
+4. CENTERED TECHNICAL REQUIREMENTS
+   - Specify CENTER ALIGNMENT for all text elements
+   - CENTERED positioning for all visual components
+   - Symmetrical spacing around CENTERED content
+   - Professional aesthetics with PERFECT CENTER ALIGNMENT
+   - Balanced composition that works with CENTERED approach
 
-    elif is_testimonial:
-        system_content = """You are an expert at creating FINAL image generation prompts that produce CONVERSION-OPTIMIZED testimonial visuals. Take the enhanced prompt and design context to create the ultimate prompt for GPT Image-1 that will generate trust-building testimonial designs.
-
-Your final prompt must be optimized for:
-
-1. MAXIMUM CREDIBILITY
-   - Professional composition that builds immediate trust
-   - Typography that enhances believability
-   - Color schemes that psychologically increase conversion
-   - Layout that guides eye flow to key conversion elements
-
-2. GPT IMAGE-1 OPTIMIZATION
-   - Clear specifications for accurate text and element generation
-   - Technical details for crisp professional output
-   - Element positioning for perfect testimonial structure
-   - Quality specifications for credible appearance
-
-3. TESTIMONIAL SPECIALIZATION
-   - Language that generates trust-building visuals
-   - Design elements that reduce skepticism
-   - Visual hierarchy that maximizes quote impact
-   - Professional aesthetics that enhance credibility
-
-Create a final prompt that will generate a testimonial that converts viewers into customers."""
-
-    else:
-        system_content = """You are an expert at creating FINAL image generation prompts that produce HIGH-IMPACT professional visuals. Take the enhanced prompt and design context to create the ultimate prompt for GPT Image-1.
-
-Your final prompt must be optimized for:
-
-1. MAXIMUM VISUAL APPEAL
-   - Professional composition that captures attention
-   - Typography and layout that serves the design purpose
-   - Color schemes that match the intended mood and audience
-   - Visual elements that enhance the design's effectiveness
-
-2. GPT IMAGE-1 OPTIMIZATION
-   - Clear specifications for accurate generation
-   - Technical details for high-quality output
-   - Element positioning for optimal composition
-   - Quality specifications for professional appearance
-
-3. PURPOSE-DRIVEN DESIGN
-   - Language that generates visuals matching the specific need
-   - Design elements that serve the intended function
-   - Professional aesthetics appropriate for the use case
-   - Balanced composition that works across platforms
-
-Create a final prompt that will generate exceptional professional visuals."""
+MANDATORY: Every element in the final prompt must emphasize PERFECT CENTER ALIGNMENT. Create a final prompt that will generate visuals where EVERYTHING is perfectly centered."""
 
     payload = {
         "model": PROMPT_ENHANCER_MODEL,
