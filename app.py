@@ -305,43 +305,56 @@ def pre_enhance_prompt(user_input):
         "messages": [
             {
                 "role": "system",
-                "content": """You are a assistant you are a prompt enhancer your task is to take input from user like "create coming soon poster for clothing company" or "create testimonial for a restaurant" you need to convert this prompt into detailed examples given below. You must modify prompt according to prompt given by user. you must make sure color and font should same as given by user if not given kindly use it on your own while keeping design principles and fundamentals in your mind.
+                "content": """You are an expert prompt enhancer specializing in creating detailed, comprehensive prompts that generate exceptional graphic designs. Your task is to transform basic user requests into rich, detailed prompts following the proven format from high-quality training examples.
 
-Don't add custom elements, shapes, and random figures in prompts.
-You must generate a prompt same as given below examples
+CRITICAL REQUIREMENTS:
+1. Follow the EXACT format structure from the examples below
+2. Include comprehensive layout descriptions with specific positioning
+3. Specify exact fonts, sizes, and styling details  
+4. Define precise color schemes with background and text colors
+5. Detail decorative elements and their placement
+6. Ensure professional typography hierarchy
+7. Create prompts that result in visually stunning, usable designs
 
+TESTIMONIAL DESIGN FORMAT (use this structure for testimonials):
+"Create a testimonial with a [background color] background featuring a [container description]. The layout includes a [title description] at the [position], styled with the [font name] font, placed [positioning details]. Below, there are [decorative element count and description] arranged [arrangement], adding [visual effect]. The body text, written in [font name] font, is [positioning] and displays [content description], ensuring [quality requirement]. Finally, include [additional elements] to enhance [design goal].
 
-Examples for Coming Soon Pages: -
+**Image:** No image
+**Fonts:** [Font 1], [Font 2], [Font 3]
+**Custom Elements:** [Element description] *[count]"
 
-- Design a clean and elegant coming soon page with a black rectangular border, centered "Coming Soon" text in a cursive font, and a white background using Water Brush font at 60px size.
-- Design a modern coming soon page with a sleek black background, a prominent complex SVG graphic, centered layout, minimalist text, and seamless integration of decorative SVG elements.
-- Design a stylish coming soon page with a soft pink background, golden brown border, cursive "something" in Allura font, and main text in Times New Roman font with heart symbols and website link.
-- Create a coming soon page with a light beige background, dark gray content area featuring large white text for "COMING SOON," a website URL, and a - "GRAND OPENING" button styled in green with custom fonts.
-- Design a natural-themed coming soon page with a dark green background, featuring Bebas Neue font in large size for "Coming" and "soon," a countdown section, and an angled exclamation mark graphic in the bottom right corner.
-- Design a coming soon page with a deep blue background, featuring centrally positioned text in Tektur font (white for 'COMING' with shadow, orange for 'SOON' with shadow), and white lines for definition, all slightly rotated.
-- Design a warm and welcoming coming soon page with a beige background, centered layout, modern font for the title, cursive and bold fonts for 'Coming Soon,' and simple font for a website link, including decorative SVG elements.
-- Design a warm and inviting coming soon page with a light beige background, bold 'COMING SOON' text in a darker brown color, and a date below in 'Open Sans' font.
-- Design a playful coming soon page with a cream background, grid pattern, bold text in warm taupe, cursive text in dark green, and sans-serif font for additional information, ensuring a centered layout for clarity and appeal.
-- Design an elegant coming soon page with beige background, featuring 'LARANA STORE' in bold serif font, 'BEAUTY PRODUCT' in a decorative rectangle, and 'COMING SOON' in red and cursive font, with 'STAY TUNED' and '@REALLYGREATSITE' included, along with whimsical star shapes for a playful touch.
-- Design a bold and modern coming soon page with black background, gray border, large Bebas Neue text for "COMING" and "SOON," decorative Allura font for "-Best Store-" and "Stay Tuned," and a date of 12.12.2025, with clear website link at the bottom.
-- Design a clean coming soon page with a white background, a beige box with a grey border, 'LICERIA & CO.' at the top in large dark blue-grey text, 'WE ARE' below in smaller text, 'OPEN' centered, and 'OPENING HOURS' with hours displayed below.
-- Design a modern and minimalistic coming soon page with a clean white background, featuring centered text in Open Sans font and time indicators styled in dark gray.
-- Design a coming soon page with centered text elements in black color on a soft pink background, featuring the phrases 'NOW WE ARE', 'OPEN', and 'VISIT OUR SITE' with specific font styles and sizes. Include a website link at the bottom in a regular font.
+COMING SOON DESIGN FORMAT (use this structure for coming soon pages):
+"Create a coming soon page with a [background description] background, featuring [main layout elements]. The layout includes [primary text] styled in [font details] at [size and positioning]. Below, [secondary elements] are positioned [placement details]. The design incorporates [decorative elements] with [color specifications] for [visual purpose]. Additional elements include [supporting content] in [font specifications], [positioning], ensuring [design quality]. The overall composition maintains [design principles] suitable for [target purpose].
 
-Examples for Testimonial Designs: -
+**Image:** No image  
+**Fonts:** [Font 1], [Font 2], [Font 3]
+**Custom Elements:** [Element description] *[count]"
 
+ENHANCED TRAINING EXAMPLES - USE THESE AS REFERENCE:
 
-- Design a testimonial graphic with a teal background, featuring a beige square container with "TESTIMONIAL" in bold Alfarn font, three orange circles below, PT Serif font for customer experience lines, and square quotation marks for visual appeal.,
-- Design a testimonial with a white background, a large pink circle in the center, testimonial text in Raleway font, customer's name at the bottom, and decorative elements like 4-spoke stars and a dotted circle.,
-- Create a testimonial with a cream background, black quotation marks, centered title "Testimonial," testimonial text "We couldn't be happier with the outstanding service provided by Weblake Company...," author name "- Linda Brown -" centered below, and website URL "a.barnescopy.site.com" at the bottom in Instrument Serif font.,
-- Design a testimonial with a neon green header, black background, and round corner speech box, featuring the title "CLIENT TESTIMONIAL" in Bebas Neue font at 80px, testimonial text in Neue font at 42px, and name "MIHIR GEHLOT" in Raleway font at 36px, all centered and styled accordingly.,
-- Design a testimonial with a blue background and a light blue header, featuring a bold "Testimonial" title in orange Abril Fatface font, followed by a warm message in Raleway font within a white speech box with rounded corners. Include the website URL in PT Serif font at the bottom.,
-- Design a testimonial with yellow background, a central white text box with dotted border, Lato font for main message, Montserrat font for name "Olivia Wilson," and a blue underline, without an image.,
-- Create a testimonial with a mint green background, featuring a bold red "CLIENT FEEDBACK" title at the top, a white rounded rectangle for the testimonial text, and include the customer name "OLIVIA WILSON" with five blue stars for a 5-star rating.,
-- Design a testimonial with a centered title "CLIENT REVIEWS" in bold Courier Std font, italic Coromont Garamond text in a dark gray container, and five gold stars for rating, all on a clean white background.,
-- Design a testimonial with Viaboda Libre title and Playfair Display font for positive feedback by "Rakhi Sawant," with left and right quote SVGs on a pale yellow background.,
-- Design a testimonial with a blue background and a light blue header, featuring a bold "Testimonial" title in orange Abril Fatface font, followed by a warm message in Raleway font within a white speech box with rounded corners. Include the website URL in PT Serif font at the bottom.,
-"""
+TESTIMONIAL EXAMPLES:
+- "Create a testimonial with a teal background featuring a beige square container at the center. The layout includes a large bold 'TESTIMONIAL' text at the top, styled with the Alfarn font, placed in the middle of the container. Below, there are three decorative circles in orange arranged horizontally, adding a playful touch. The body text, written in PT Serif font, is centered and displays a series of lines about customer experience, ensuring a clear and engaging read. Finally, include square quotation marks on either side of the testimonial text to enhance the visual appeal and authenticity.
+
+**Image:** No image
+**Fonts:** Alfarn, PT Serif, Aileron  
+**Custom Elements:** Square quotation marks *2"
+
+- "Create a testimonial with a white background featuring a large pink circle at the center. The layout includes testimonial text placed centrally with multiple lines, and the customer's name at the bottom. Decoratively, there are four 4-spoke stars located in each corner of the design and a dotted circle element subtly integrated around the testimonial. The text is styled using the Raleway font, with the testimonial text in a size of 42, and the customer's name in a larger size of 48, both in black and dark blue respectively. The design maintains a clean, professional appearance suitable for showcasing customer feedback.
+
+**Image:** No image
+**Fonts:** Raleway
+**Custom Elements:** 4 spoke star *4, dotted circle"
+
+MANDATORY ENHANCEMENTS:
+- Always specify exact font names, sizes, and styling
+- Include precise color specifications (hex codes when possible)
+- Detail container shapes, borders, and backgrounds
+- Specify text positioning and alignment
+- Include decorative elements count and placement
+- Ensure responsive and accessible design principles
+- Add professional finishing touches
+
+Transform the user's request into this comprehensive format while maintaining design excellence and usability."""
             },
             {
                 "role": "user",
@@ -379,25 +392,46 @@ def enhance_prompt_with_chat(user_input):
         "messages": [
             {
                 "role": "system",
-                "content": """You are a prompt enhancer assistant. You transform simple, brief prompts into detailed,
-                comprehensive prompts that provide specific details, requirements, and context to help generate better results.
-                
-                For both coming soon pages and testimonial designs, ensure you include specific details about:
-                - Layout and positioning
-                - Font choices, sizes, and styles
-                - Color schemes and background designs
-                - Decorative elements and their placement
-                - Text content and hierarchy
-                - Spacing and alignment
+                "content": """You are an expert SVG prompt enhancer specializing in transforming design concepts into ultra-detailed, comprehensive prompts that generate exceptional SVG graphics. Your role is to take the enhanced design descriptions and convert them into precise technical specifications for SVG generation.
 
-                
-                Add these requirements at the end of each prompt:
-                'Compulsory in you use create good svg code must meaningfull and good and also usable for user ok msut look good'
-                'Compulsory in you use any color must make sense and text color and and all continer bg color must visible togther'
-                'Compulsory in This must you make all svg code must be center align in good aligmnet'
-                'Compulsory IN THIS FETCH FONT USING LINK AND FONT FACE BOTH
-                'Compulsory IN THIS ALIGMENT MUST BE GOOD AND GOOD LOOKING"
-                '"""
+CRITICAL SVG ENHANCEMENT REQUIREMENTS:
+1. Convert design descriptions into detailed SVG technical specifications
+2. Specify exact SVG elements, attributes, and styling
+3. Include precise positioning with viewBox and coordinate systems  
+4. Define comprehensive color schemes with hex codes
+5. Detail font loading, sizing, and text positioning
+6. Specify all decorative elements as SVG shapes
+7. Ensure responsive, scalable, and accessible SVG code
+
+SVG TECHNICAL SPECIFICATIONS TO INCLUDE:
+- ViewBox dimensions and aspect ratio
+- SVG namespace and proper DOCTYPE
+- Font loading via <defs> and @font-face
+- Text elements with precise x,y positioning
+- Shape elements (rect, circle, path, polygon) with exact coordinates
+- Color gradients and fills with hex values
+- Text styling (font-family, font-size, font-weight, text-anchor)
+- Group elements for proper layering
+- Responsive scaling considerations
+
+MANDATORY SVG QUALITY REQUIREMENTS:
+- All SVG code must be semantically meaningful and well-structured
+- Text and background colors must have sufficient contrast (WCAG AA compliant)
+- All elements must be properly centered and aligned within the viewBox
+- Font loading must use both @font-face and fallback fonts
+- All coordinates and sizing must create visually balanced compositions
+- SVG must be optimized for both web display and print quality
+- Code must be clean, properly indented, and easily maintainable
+
+ENHANCEMENT PROCESS:
+1. Analyze the design description for layout, colors, fonts, and elements
+2. Create detailed SVG structure with proper element hierarchy
+3. Specify exact positioning for all text and graphical elements
+4. Include comprehensive styling with CSS-in-SVG or inline styles
+5. Add responsive considerations and accessibility features
+6. Ensure cross-browser compatibility and performance optimization
+
+Transform the design description into a comprehensive SVG specification that will generate professional, pixel-perfect graphics."""
             },
             {
                 "role": "user",
@@ -436,47 +470,67 @@ def enhance_prompt_for_gpt_image(user_prompt, design_context=None):
 
     # Create specialized system prompt based on design type
     if is_coming_soon:
-        system_prompt = """You are an expert prompt enhancer for GPT Image-1, specializing in creating MIND-BLOWING "Coming Soon" posters that stop viewers in their tracks. Transform user requests into detailed, specific prompts that will generate visually stunning coming soon designs.
+        system_prompt = """You are an expert prompt enhancer for GPT Image-1, specializing in creating EXCEPTIONAL "Coming Soon" graphics following the proven format structure from high-quality training examples. Transform user requests into comprehensive, detailed prompts that generate visually stunning coming soon designs.
 
-Your enhanced prompts should focus on:
-1. VISUAL IMPACT: Eye-catching elements, dramatic lighting, bold compositions
-2. TYPOGRAPHY: Massive, attention-grabbing "COMING SOON" text with premium fonts
-3. COLOR SCHEMES: Vibrant gradients, neon accents, or sophisticated palettes
-4. BACKGROUND ELEMENTS: Dynamic textures, abstract patterns, or cinematic backdrops
-5. MOOD & ATMOSPHERE: Excitement, anticipation, premium quality, exclusivity
-6. TECHNICAL SPECS: 1024x1024, high contrast, GPT Image-1 optimized
+CRITICAL FORMAT REQUIREMENTS FOR COMING SOON PAGES:
+Use this EXACT structure: "Create a coming soon page with a [background description] background, featuring [main layout elements]. The layout includes [primary text] styled in [font details] at [size and positioning]. Below, [secondary elements] are positioned [placement details]. The design incorporates [decorative elements] with [color specifications] for [visual purpose]. Additional elements include [supporting content] in [font specifications], [positioning], ensuring [design quality]. The overall composition maintains [design principles] suitable for [target purpose]."
 
-Enhancement Guidelines:
-- Use words like "explosive", "dramatic", "premium", "cutting-edge", "revolutionary"
-- Specify exact color palettes with hex codes when possible
-- Include lighting effects (neon glow, dramatic shadows, spotlights)
-- Add texture details (metallic, glass, holographic, matte)
-- Specify typography styles (futuristic, bold sans-serif, modern)
-- Include composition details (centered, asymmetrical, dynamic)
+MANDATORY ELEMENTS TO SPECIFY:
+1. BACKGROUND: Specific color/texture with hex codes (e.g., "black background with gray border")
+2. PRIMARY TEXT: "COMING SOON" styling with exact fonts and sizes (e.g., "Bebas Neue font in large size")
+3. TYPOGRAPHY HIERARCHY: Main title, subtitle, supporting text with specific fonts
+4. DECORATIVE ELEMENTS: Exact count and placement (e.g., "three decorative circles", "star shapes")
+5. LAYOUT STRUCTURE: Centered, bordered, container-based designs
+6. COLOR SPECIFICATIONS: Background, text, accent colors with hex codes
+7. SUPPORTING CONTENT: Website links, dates, company names with positioning
 
-Return ONLY the enhanced prompt optimized for GPT Image-1, no explanations."""
+PROVEN SUCCESSFUL EXAMPLES TO FOLLOW:
+- Black background with gray border, Bebas Neue font for "COMING" and "SOON", Allura decorative fonts
+- Deep blue background with white/orange Tektur font, shadows and white lines, rotated composition
+- Beige background with modern fonts, cursive and bold combinations, decorative SVG elements
+- Light beige with dark brown "COMING SOON", Open Sans dates, minimalist approach
+- Dark green natural theme with Bebas Neue, countdown sections, angled graphics
+
+TECHNICAL SPECIFICATIONS:
+- Size: 1024x1024 pixels optimized for GPT Image-1
+- High contrast for dramatic impact and readability
+- Bold, attention-grabbing typography
+- Professional color psychology for anticipation
+- Balanced composition with premium aesthetics
+- Mobile-responsive design considerations
+
+Transform the user's coming soon request into this comprehensive format ensuring maximum visual impact and professional quality."""
 
     elif is_testimonial:
-        system_prompt = """You are an expert prompt enhancer for GPT Image-1, specializing in creating MIND-BLOWING testimonial posters that build trust and credibility while being visually stunning. Transform user requests into detailed prompts for generating powerful testimonial designs.
+        system_prompt = """You are an expert prompt enhancer for GPT Image-1, specializing in creating EXCEPTIONAL testimonial graphics following the proven format structure from high-quality training examples. Transform user requests into comprehensive, detailed prompts that generate professional testimonial designs.
 
-Your enhanced prompts should focus on:
-1. TRUST ELEMENTS: Professional layouts, clean typography, credible visual design
-2. VISUAL HIERARCHY: Clear quote presentation, prominent attribution, star ratings
-3. COLOR PSYCHOLOGY: Trust-building colors (blues, whites, golds), sophisticated palettes
-4. BACKGROUND DESIGN: Clean, professional, or subtly branded backgrounds
-5. TYPOGRAPHY: Readable quote fonts, professional attribution text, emphasis on key phrases
-6. CREDIBILITY INDICATORS: Stars, badges, professional photos, company logos
-7. TECHNICAL SPECS: 1024x1024, high readability, clean composition
+CRITICAL FORMAT REQUIREMENTS FOR TESTIMONIALS:
+Use this EXACT structure: "Create a testimonial with a [background color] background featuring a [container description]. The layout includes a [title description] at the [position], styled with the [font name] font, placed [positioning details]. Below, there are [decorative element count and description] arranged [arrangement], adding [visual effect]. The body text, written in [font name] font, is [centered/positioned] and displays [content description], ensuring [quality requirement]. Finally, include [additional elements] to enhance [design goal]."
 
-Enhancement Guidelines:
-- Use words like "professional", "trustworthy", "credible", "polished", "authentic"
-- Specify clean, readable typography with proper hierarchy
-- Include trust-building visual elements (5-star ratings, checkmarks, badges)
-- Add professional color schemes with hex codes
-- Specify background treatments (gradient, texture, clean)
-- Include layout details (centered quotes, side attribution, balanced composition)
+MANDATORY ELEMENTS TO SPECIFY:
+1. BACKGROUND: Specific color with hex code (e.g., "teal background #14B8A6")
+2. CONTAINER: Shape, size, positioning (e.g., "beige square container at center")
+3. TITLE: Exact text, font, size, positioning (e.g., "'TESTIMONIAL' in bold Alfarn font")
+4. DECORATIVE ELEMENTS: Count, type, arrangement (e.g., "three orange circles arranged horizontally")
+5. BODY TEXT: Font, size, positioning, content structure
+6. ATTRIBUTION: Customer name, styling, placement
+7. VISUAL ELEMENTS: Stars, quotes, borders, graphics with exact specifications
 
-Return ONLY the enhanced prompt optimized for GPT Image-1, no explanations."""
+PROVEN SUCCESSFUL EXAMPLES TO FOLLOW:
+- Teal background with beige square container, Alfarn font titles, PT Serif body text, orange circles, square quotation marks
+- White background with large pink circle, Raleway font, 4-spoke stars in corners, dotted circle elements
+- Mint green background with red titles, white rounded rectangles, five blue stars for ratings
+- Golden background with white containers, Courier Std headings, five red five-spoke stars
+
+TECHNICAL SPECIFICATIONS:
+- Size: 1024x1024 pixels optimized for GPT Image-1
+- High contrast text for readability (WCAG AA compliant)
+- Professional typography hierarchy
+- Balanced composition with proper spacing
+- Trust-building color psychology
+- Clean, modern aesthetic
+
+Transform the user's testimonial request into this comprehensive format ensuring visual excellence and professional credibility."""
 
     elif is_poster:
         system_prompt = """You are an expert prompt enhancer for GPT Image-1, specializing in creating MIND-BLOWING posters that capture attention and communicate effectively. Transform user requests into detailed prompts for generating visually stunning poster designs.
@@ -593,7 +647,9 @@ def generate_image_with_gpt(enhanced_prompt, design_context=None):
 
 def generate_svg_from_image(image_base64, enhanced_prompt):
     """Generate SVG code from image - vtracer temporarily disabled for deployment"""
-    logger.info("SVG generation from image requested - vtracer temporarily disabled")
+    logger.info(f"SVG generation from image requested - vtracer temporarily disabled")
+    logger.info(f"Enhanced prompt provided: {enhanced_prompt[:100]}...")
+    logger.info(f"Image data size: {len(image_base64)} characters")
     
     # For now, return a message indicating vtracer is disabled
     # In the future, you can implement an alternative approach or re-enable vtracer
@@ -784,12 +840,30 @@ Original Request:
 {user_input}"""
         logger.info("Design context preparation complete")
         
-        # Stages 4-5: Enhancement Phases Skipped
-        logger.info("\n[STAGES 4-5: Enhancement Phases SKIPPED]")
+        # Stage 4: Pre-Enhancement Phase - Convert to detailed format
+        logger.info("\n[STAGE 4: Pre-Enhancement Phase]")
         logger.info("-"*50)
-        prompt_to_use = user_input
-        pre_enhanced_prompt = user_input
-        enhanced_prompt = user_input
+        logger.info("Converting user input to detailed format using JSONL examples...")
+        logger.info(f"Using model: {PRE_ENHANCER_MODEL}")
+        pre_enhanced_prompt = pre_enhance_prompt(user_input)
+        logger.info("\nPre-Enhanced Prompt Generated:")
+        for line in pre_enhanced_prompt.split('\n')[:5]:  # Log first 5 lines
+            logger.info(f"  {line}")
+        logger.info("  ...")
+        
+        # Stage 5: SVG Enhancement Phase - Convert to SVG technical specs
+        logger.info("\n[STAGE 5: SVG Enhancement Phase]")
+        logger.info("-"*50)
+        logger.info("Converting design description to SVG technical specifications...")
+        logger.info(f"Using model: {PROMPT_ENHANCER_MODEL}")
+        enhanced_prompt = enhance_prompt_with_chat(pre_enhanced_prompt)
+        logger.info("\nSVG-Enhanced Prompt Generated:")
+        for line in enhanced_prompt.split('\n')[:5]:  # Log first 5 lines
+            logger.info(f"  {line}")
+        logger.info("  ...")
+        
+        # Use the enhanced prompt for image generation
+        prompt_to_use = pre_enhanced_prompt  # Use pre-enhanced for GPT Image-1
 
         # Stage 6: Generate image using GPT Image-1
         logger.info("STAGE 6: Image Generation Phase")
@@ -854,12 +928,7 @@ Original Request:
 def chat_with_ai_about_design(messages, current_svg=None):
     """Enhanced conversational AI that can discuss and modify designs"""
     logger.info("Starting conversational AI interaction")
-    
-    url = OPENAI_CHAT_ENDPOINT
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
-    }
+    logger.info(f"Processing {len(messages)} messages with {'SVG context' if current_svg else 'no context'}")
 
     # Create system prompt that includes SVG knowledge
     system_prompt = """You are an expert AI design assistant with deep knowledge of SVG creation and manipulation. You can:
@@ -1480,7 +1549,10 @@ Guidelines:
 - Use proper layering with <g> groups
 - Apply subtle opacity adjustments if needed for text readability
 - Ensure the combined result looks professional and cohesive
-- Return ONLY the final combined SVG code, no explanations"""
+
+CRITICAL: Return ONLY the complete SVG code starting with <svg and ending with </svg>. 
+Do not include any explanations, comments, or markdown formatting. 
+The response must be valid SVG code that can be directly used."""
 
     user_prompt = f"""Please combine these two SVGs intelligently:
 
@@ -1524,17 +1596,28 @@ Create a single, perfectly combined SVG that merges both elements beautifully.""
 
         ai_response = response_data["choices"][0]["message"]["content"]
         
-        # Extract SVG code from the response
-        svg_pattern = r'<svg.*?</svg>'
-        svg_match = re.search(svg_pattern, ai_response, re.DOTALL)
+        # Extract SVG code from the response - improved pattern matching
+        # First try to find SVG within code blocks
+        code_block_pattern = r'```(?:svg)?\s*(<svg.*?</svg>)\s*```'
+        code_block_match = re.search(code_block_pattern, ai_response, re.DOTALL | re.IGNORECASE)
+        
+        if code_block_match:
+            combined_svg = code_block_match.group(1)
+            logger.info("AI successfully combined SVGs (from code block)")
+            return combined_svg
+        
+        # Then try direct SVG pattern with more flexible matching
+        svg_pattern = r'<svg[^>]*>.*?</svg>'
+        svg_match = re.search(svg_pattern, ai_response, re.DOTALL | re.IGNORECASE)
         
         if svg_match:
             combined_svg = svg_match.group(0)
-            logger.info("AI successfully combined SVGs")
+            logger.info("AI successfully combined SVGs (direct)")
             return combined_svg
-        else:
-            logger.warning("Could not extract SVG from AI response, using fallback")
-            return simple_combine_svgs_fallback(text_svg_code, traced_svg_code)
+        
+        # If no SVG found, log the response for debugging
+        logger.warning(f"Could not extract SVG from AI response. Response preview: {ai_response[:200]}...")
+        return simple_combine_svgs_fallback(text_svg_code, traced_svg_code)
             
     except Exception as e:
         logger.error(f"Error in AI SVG combination: {str(e)}")
@@ -1542,21 +1625,36 @@ Create a single, perfectly combined SVG that merges both elements beautifully.""
         return simple_combine_svgs_fallback(text_svg_code, traced_svg_code)
 
 def simple_combine_svgs_fallback(text_svg_code, traced_svg_code):
-    """Fallback simple combination method"""
+    """Fallback simple combination method with improved error handling"""
     try:
+        logger.info("Using fallback SVG combination method")
+        
+        # Validate inputs
+        if not text_svg_code or not traced_svg_code:
+            logger.warning("Missing SVG input data for fallback")
+            return traced_svg_code if traced_svg_code else text_svg_code
+        
         # Extract content from both SVGs
-        text_match = re.search(r'<svg[^>]*>(.*?)</svg>', text_svg_code, re.DOTALL)
-        traced_match = re.search(r'<svg[^>]*>(.*?)</svg>', traced_svg_code, re.DOTALL)
+        text_match = re.search(r'<svg[^>]*>(.*?)</svg>', text_svg_code, re.DOTALL | re.IGNORECASE)
+        traced_match = re.search(r'<svg[^>]*>(.*?)</svg>', traced_svg_code, re.DOTALL | re.IGNORECASE)
         
-        if not text_match or not traced_match:
-            logger.warning("Could not extract SVG content, returning traced SVG")
-            return traced_svg_code
+        if not text_match:
+            logger.warning("Could not extract text SVG content, using entire text SVG")
+            text_content = text_svg_code
+        else:
+            text_content = text_match.group(1).strip()
+            
+        if not traced_match:
+            logger.warning("Could not extract traced SVG content, using entire traced SVG")
+            traced_content = traced_svg_code
+        else:
+            traced_content = traced_match.group(1).strip()
         
-        text_content = text_match.group(1).strip()
-        traced_content = traced_match.group(1).strip()
-        
-        # Create combined SVG
+        # Create combined SVG with better structure
         combined_svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" width="1080" height="1080">
+  <defs>
+    <!-- Include any definitions from original SVGs -->
+  </defs>
   <g id="background-layer" opacity="0.9">
     {traced_content}
   </g>
@@ -1565,10 +1663,15 @@ def simple_combine_svgs_fallback(text_svg_code, traced_svg_code):
   </g>
 </svg>'''
         
+        logger.info("Fallback SVG combination completed successfully")
         return combined_svg
+        
     except Exception as e:
         logger.error(f"Error in fallback SVG combination: {str(e)}")
-        return traced_svg_code
+        logger.error(f"Text SVG preview: {text_svg_code[:100] if text_svg_code else 'None'}...")
+        logger.error(f"Traced SVG preview: {traced_svg_code[:100] if traced_svg_code else 'None'}...")
+        # Return the traced SVG as the safest fallback
+        return traced_svg_code if traced_svg_code else text_svg_code
 
 @app.route('/api/generate-parallel-svg', methods=['POST'])
 def generate_parallel_svg():
@@ -1583,7 +1686,6 @@ def generate_parallel_svg():
 
         data = request.json or {}
         user_input = data.get('prompt', '')
-        skip_enhancement = data.get('skip_enhancement', False)
 
         if not user_input:
             return jsonify({'error': 'No prompt provided'}), 400
@@ -1638,10 +1740,23 @@ def generate_parallel_svg():
         # Stage 8: AI-Powered SVG Combination
         logger.info('Stage 8: AI-Powered SVG Combination using GPT-4.1-nano')
         combined_svg_code = ai_combine_svgs(text_svg_code, clean_svg_code)
+        
+        # Validate the combined SVG
+        if not combined_svg_code or not combined_svg_code.strip():
+            logger.error("Combined SVG is empty, using fallback")
+            combined_svg_code = simple_combine_svgs_fallback(text_svg_code, clean_svg_code)
+        
+        # Ensure the SVG is well-formed
+        if not combined_svg_code.strip().startswith('<svg'):
+            logger.warning("Combined SVG doesn't start with <svg, using fallback")
+            combined_svg_code = simple_combine_svgs_fallback(text_svg_code, clean_svg_code)
+        
         combined_svg_filename = f"combined_svg_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}.svg"
         combined_svg_path = os.path.join(IMAGES_DIR, combined_svg_filename)
-        with open(combined_svg_path, 'w') as f:
+        with open(combined_svg_path, 'w', encoding='utf-8') as f:
             f.write(combined_svg_code)
+        
+        logger.info(f"Combined SVG saved successfully: {combined_svg_filename}")
 
         # Create a session subfolder and move outputs there
         session_folder = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
@@ -1700,11 +1815,13 @@ def generate_parallel_svg():
             },
             'text_svg': {
                 'code': text_svg_code,
-                'path': f"parallel/{session_folder}/{text_svg_path}"
+                'path': f"parallel/{session_folder}/{text_svg_path}",
+                'url': text_svg_url
             },
             'clean_svg': {
                 'code': clean_svg_code,
-                'path': f"parallel/{session_folder}/{os.path.basename(clean_svg_path)}"
+                'path': f"parallel/{session_folder}/{os.path.basename(clean_svg_path)}",
+                'url': clean_svg_url
             },
             'combined_svg': {
                 'code': combined_svg_code,
@@ -1716,6 +1833,39 @@ def generate_parallel_svg():
 
     except Exception as e:
         logger.error(f"Error in generate_parallel_svg: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/test-enhancement', methods=['POST'])
+def test_enhancement():
+    """Test endpoint to validate the enhanced prompt pipeline"""
+    try:
+        data = request.json or {}
+        user_input = data.get('prompt', '')
+        
+        if not user_input:
+            return jsonify({"error": "No prompt provided"}), 400
+        
+        logger.info(f"Testing enhancement pipeline with: {user_input}")
+        
+        # Stage 1: Pre-enhancement (detailed format)
+        pre_enhanced = pre_enhance_prompt(user_input)
+        
+        # Stage 2: SVG technical enhancement  
+        svg_enhanced = enhance_prompt_with_chat(pre_enhanced)
+        
+        # Stage 3: GPT Image-1 optimization
+        image_enhanced = enhance_prompt_for_gpt_image(pre_enhanced)
+        
+        return jsonify({
+            "original": user_input,
+            "pre_enhanced": pre_enhanced,
+            "svg_enhanced": svg_enhanced,
+            "image_enhanced": image_enhanced,
+            "status": "success"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in test enhancement: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
