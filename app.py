@@ -160,118 +160,38 @@ def plan_design(user_input):
         "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
     }
 
-    # Detect design type for specialized planning
-    prompt_lower = user_input.lower()
-    is_coming_soon = any(word in prompt_lower for word in ['coming soon', 'coming', 'soon', 'announcement', 'launch'])
-    is_testimonial = any(word in prompt_lower for word in ['testimonial', 'review', 'quote', 'feedback'])
+    # Use simplified, practical planning approach focused on concrete specifications
+    system_content = """You are a practical design planner. Create a clear, actionable plan for the design request that focuses on specific, implementable details.
 
-    if is_coming_soon:
-        system_content = """You are a design planner specializing in STUNNING "Coming Soon" posters that generate massive excitement and anticipation. Create a strategic plan that will result in visually explosive, high-impact designs.
+Your plan should include:
+1. Layout Structure
+   - Overall composition (centered, asymmetrical, grid-based)
+   - Key elements placement and sizing
+   - Visual hierarchy and focal points
 
-Your plan must deliver:
-1. VISUAL IMPACT STRATEGY
-   - Explosive main focal point (what grabs attention first)
-   - Dynamic composition layout (diagonal, asymmetrical, or centered power)
-   - Color psychology for excitement (neon, gradient, high-contrast combinations)
-   - Lighting effects strategy (glow, spotlights, dramatic shadows)
+2. Typography Specifications
+   - Specific font recommendations (Google Fonts preferred)
+   - Font sizes and weights for different text elements
+   - Text alignment and spacing
 
-2. TYPOGRAPHY MASTERY
-   - Massive "COMING SOON" text treatment (size, style, effects)
-   - Font psychology (futuristic, bold, premium, cutting-edge)
-   - Text effects (3D, neon glow, metallic, holographic)
-   - Hierarchy for secondary text (date, brand, tagline)
+3. Color Scheme
+   - Primary background color
+   - Text colors for readability
+   - Accent colors for highlights
+   - Specific hex codes when possible
 
-3. COLOR EXPLOSION
-   - Primary color scheme with exact hex codes
-   - Gradient directions and color stops
-   - Accent colors for highlights and effects
-   - Background color strategy (dark dramatic, bright energy, or gradient)
+4. Content Elements
+   - Main heading/title treatment
+   - Secondary text placement
+   - Decorative elements (borders, shapes, icons)
+   - Brand elements if applicable
 
-4. BACKGROUND MAGIC
-   - Texture strategy (metallic, glass, abstract, geometric)
-   - Pattern elements (circles, lines, shapes, particles)
-   - Depth layers (foreground, middle, background)
-   - Motion implications (speed lines, blur effects, energy)
+5. Technical Requirements
+   - Dimensions and aspect ratio
+   - File format considerations
+   - Quality standards for output
 
-5. EMOTIONAL TRIGGERS
-   - Excitement amplifiers (burst effects, energy rays)
-   - Anticipation builders (countdown elements, mystery)
-   - Premium quality indicators (luxury textures, refined details)
-   - Urgency creators (limited time, exclusive access)
-
-Focus on creating a plan that will generate a poster that people CAN'T ignore and MUST share."""
-
-    elif is_testimonial:
-        system_content = """You are a design planner specializing in POWERFUL testimonial posters that build massive trust and credibility while being visually stunning. Create a strategic plan for testimonials that convert.
-
-Your plan must deliver:
-1. TRUST-BUILDING VISUAL STRATEGY
-   - Professional layout that screams credibility
-   - Clean composition with perfect balance
-   - Color psychology for trust (blues, whites, golds, professional grays)
-   - Subtle premium effects that enhance rather than distract
-
-2. TESTIMONIAL HIERARCHY MASTERY
-   - Quote presentation strategy (size, placement, emphasis)
-   - Attribution prominence (name, title, company, photo)
-   - Star rating visual treatment (size, color, placement)
-   - Supporting elements (badges, logos, certifications)
-
-3. COLOR PSYCHOLOGY FOR CONVERSION
-   - Primary trust colors with exact hex codes
-   - Professional gradient strategies
-   - Accent colors for highlights and call-to-action elements
-   - Background color for credibility and readability
-
-4. CREDIBILITY ENHANCEMENT
-   - Visual trust indicators (5-star ratings, badges, checkmarks)
-   - Professional photography suggestions
-   - Company logo integration strategy
-   - Background texture (subtle, professional, clean)
-
-5. READABILITY PERFECTION
-   - Font strategy for maximum readability
-   - Contrast ratios for accessibility
-   - White space utilization for focus
-   - Visual flow for easy consumption
-
-6. CONVERSION OPTIMIZATION
-   - Call-to-action placement and design
-   - Social proof amplification techniques
-   - Visual elements that encourage action
-   - Mobile-friendly design considerations
-
-Focus on creating testimonials that build immediate trust and drive action."""
-
-    else:
-        system_content = """You are a design planner specializing in HIGH-IMPACT visual designs that generate amazing results. Create a strategic plan focused on maximum visual appeal and professional quality.
-
-Your plan must deliver:
-1. VISUAL IMPACT STRATEGY
-   - Attention-grabbing focal points
-   - Dynamic composition and layout
-   - Color strategy for maximum appeal
-   - Professional finishing touches
-
-2. DESIGN EXCELLENCE
-   - Typography mastery and hierarchy
-   - Color psychology and harmony
-   - Layout perfection and balance
-   - Visual effects and enhancements
-
-3. PROFESSIONAL QUALITY
-   - Technical specifications for crisp output
-   - Brand consistency and appeal
-   - Target audience optimization
-   - Platform-specific considerations
-
-4. IMPLEMENTATION ROADMAP
-   - Priority elements and order
-   - Quality checkpoints
-   - Enhancement opportunities
-   - Final optimization steps
-
-Focus on creating designs that stand out and deliver results."""
+Focus on creating a practical, implementable plan with specific details that can be directly used for design creation."""
 
     payload = {
         "model": PLANNER_MODEL,
@@ -308,133 +228,42 @@ def generate_design_knowledge(design_plan, user_input):
         "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
     }
 
-    # Detect design type for specialized knowledge
-    prompt_lower = user_input.lower()
-    is_coming_soon = any(word in prompt_lower for word in ['coming soon', 'coming', 'soon', 'announcement', 'launch'])
-    is_testimonial = any(word in prompt_lower for word in ['testimonial', 'review', 'quote', 'feedback'])
+    # Use practical, actionable design knowledge approach
+    system_content = """You are a practical design knowledge expert. Provide specific, actionable design insights and best practices that can be directly implemented.
 
-    if is_coming_soon:
-        system_content = """You are a design knowledge expert specializing in creating VIRAL "Coming Soon" posters that break the internet. Based on the design plan, provide cutting-edge insights and techniques to create visually explosive designs.
+Provide practical knowledge for:
 
-Provide ADVANCED knowledge for:
+1. Typography Best Practices
+   - Recommended font combinations that work well together
+   - Optimal font sizes for different screen sizes and readability
+   - Proper line spacing and letter spacing guidelines
+   - Font loading and fallback strategies
 
-1. VISUAL EXPLOSION TECHNIQUES
-   - Advanced color harmony for maximum impact (triadic, tetradic, split-complementary)
-   - Lighting effect mastery (rim lighting, volumetric rays, neon glows)
-   - Composition secrets (rule of thirds, golden ratio, dynamic symmetry)
-   - Depth creation techniques (parallax layers, atmospheric perspective)
+2. Color Theory Application
+   - Proven color combinations with hex codes
+   - Contrast ratios for accessibility compliance
+   - Background and text color pairings
+   - Brand-appropriate color choices
 
-2. TYPOGRAPHY THAT COMMANDS ATTENTION
-   - Font psychology and emotional triggers
-   - Advanced text effects (bevels, extrusions, reflections, shadows)
-   - Kerning and tracking for impact
-   - Font pairing science for excitement and energy
-
-3. COLOR SCIENCE FOR EXCITEMENT
-   - Exact hex codes for high-energy palettes
-   - Gradient angle mathematics for dynamic flow
-   - Color temperature manipulation for mood
-   - Contrast ratios for accessibility while maintaining impact
-
-4. BACKGROUND MASTERY
-   - Texture creation techniques (procedural, photographic, abstract)
-   - Pattern psychology (geometric, organic, technological)
-   - Depth layer optimization (foreground, middle ground, background)
-   - Motion blur and speed line techniques
-
-5. PSYCHOLOGICAL IMPACT AMPLIFIERS
-   - Visual rhythm for excitement
-   - Scale and proportion for dominance
-   - Negative space utilization for focus
-   - Visual weight distribution for balance
-
-6. TECHNICAL EXCELLENCE FOR IMAGE GENERATION
-   - Prompt structure for GPT Image-1 optimization
-   - Detail specification for crisp generation
-   - Element separation for clarity
-   - Scaling considerations for various platforms
-
-Focus on creating knowledge that will generate images people screenshot and share immediately."""
-
-    elif is_testimonial:
-        system_content = """You are a design knowledge expert specializing in CONVERSION-OPTIMIZED testimonial designs that build massive trust and drive action. Provide advanced insights for creating testimonials that convert.
-
-Provide ADVANCED knowledge for:
-
-1. TRUST-BUILDING VISUAL PSYCHOLOGY
-   - Color psychology for credibility (exact hex codes)
-   - Layout principles that enhance believability
-   - White space utilization for premium feel
-   - Visual hierarchy for maximum impact
-
-2. TYPOGRAPHY FOR CREDIBILITY
-   - Font selection psychology for trust
-   - Reading flow optimization techniques
-   - Quote styling for emphasis and authenticity
-   - Attribution formatting for maximum credibility
-
-3. COLOR SCIENCE FOR CONVERSION
-   - Trust color combinations with exact codes
-   - Professional gradient techniques
-   - Accent color psychology for call-to-action
-   - Background color optimization for readability
-
-4. CREDIBILITY ENHANCEMENT TECHNIQUES
-   - Star rating visual optimization
-   - Badge and certification placement strategy
-   - Professional photo integration techniques
-   - Company logo sizing and placement rules
-
-5. CONVERSION OPTIMIZATION SECRETS
-   - Visual flow design for action
-   - Call-to-action button psychology
-   - Social proof amplification techniques
-   - Mobile-first design principles
-
-6. TECHNICAL EXCELLENCE FOR TESTIMONIALS
-   - Image generation prompt optimization
-   - Text-background contrast optimization
-   - Element spacing for professional appearance
+3. Layout and Composition
+   - Grid systems and alignment principles
+   - White space utilization for clarity
+   - Visual hierarchy techniques
    - Responsive design considerations
 
-7. AUTHENTICITY INDICATORS
-   - Visual cues that enhance believability
-   - Design elements that reduce skepticism
-   - Professional formatting that builds confidence
-   - Subtle details that amplify trust
+4. Technical Implementation
+   - SVG optimization techniques
+   - File size management
+   - Cross-browser compatibility
+   - Performance optimization tips
 
-Focus on creating knowledge that generates testimonials with maximum conversion power."""
+5. Quality Assurance
+   - Design consistency checkpoints
+   - Accessibility standards
+   - User experience considerations
+   - Testing and validation methods
 
-    else:
-        system_content = """You are a design knowledge expert specializing in HIGH-IMPACT visual designs that achieve outstanding results. Provide advanced insights and techniques for creating visually stunning, professional designs.
-
-Provide ADVANCED knowledge for:
-
-1. VISUAL IMPACT MASTERY
-   - Advanced composition techniques
-   - Color harmony and psychology
-   - Typography excellence and hierarchy
-   - Professional finishing techniques
-
-2. DESIGN EXCELLENCE PRINCIPLES
-   - Layout optimization strategies
-   - Visual flow and user journey
-   - Brand consistency techniques
-   - Quality enhancement methods
-
-3. TECHNICAL OPTIMIZATION
-   - Image generation best practices
-   - Detail specification techniques
-   - Platform optimization strategies
-   - Professional quality standards
-
-4. PSYCHOLOGICAL IMPACT
-   - Visual psychology principles
-   - Emotional trigger techniques
-   - Attention-grabbing strategies
-   - Memorable design elements
-
-Focus on creating knowledge that produces exceptional visual results."""
+Focus on providing concrete, implementable advice that will directly improve design quality and user experience."""
 
     payload = {
         "model": DESIGN_KNOWLEDGE_MODEL,
@@ -462,7 +291,7 @@ Focus on creating knowledge that produces exceptional visual results."""
     return response_data["choices"][0]["message"]["content"]
 
 def pre_enhance_prompt(user_input):
-    """Initial enhancement of user query with focus on generating stunning visuals"""
+    """Initial enhancement of user query using proven examples and detailed specifications"""
     logger.info(f"Pre-enhancing prompt: {user_input[:100]}...")
     
     url = OPENAI_CHAT_ENDPOINT
@@ -471,136 +300,56 @@ def pre_enhance_prompt(user_input):
         "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
     }
 
-    # Detect design type for specialized enhancement
-    prompt_lower = user_input.lower()
-    is_coming_soon = any(word in prompt_lower for word in ['coming soon', 'coming', 'soon', 'announcement', 'launch'])
-    is_testimonial = any(word in prompt_lower for word in ['testimonial', 'review', 'quote', 'feedback'])
-
-    if is_coming_soon:
-        system_content = """You are an expert prompt enhancer specializing in MIND-BLOWING "Coming Soon" designs that generate massive excitement. Transform the design plan and knowledge into a powerful, detailed prompt optimized for creating viral-worthy coming soon visuals.
-
-Your enhanced prompt must include:
-
-1. EXPLOSIVE VISUAL COMPOSITION
-   - Dramatic focal point placement with mathematical precision
-   - Dynamic layout structure (diagonal dominance, asymmetrical power, or centered explosion)
-   - Visual hierarchy that creates immediate impact
-   - Depth layers that create cinematic quality
-
-2. TYPOGRAPHY THAT STOPS TRAFFIC
-   - Massive "COMING SOON" text with specific size relationships
-   - Font family psychology (futuristic sans-serif, bold display, or custom lettering)
-   - Advanced text effects (3D extrusion, neon glow, metallic finish, holographic)
-   - Secondary text hierarchy with exact proportions
-
-3. COLOR EXPLOSION SCIENCE
-   - Primary color palette with exact hex codes for maximum energy
-   - Gradient specifications (angles, color stops, blending modes)
-   - Accent colors for highlights and special effects
-   - Background color strategy for dramatic contrast
-
-4. BACKGROUND MAGIC TECHNIQUES
-   - Texture specifications (metallic, glass, carbon fiber, holographic)
-   - Pattern elements (geometric shapes, particle effects, energy lines)
-   - Lighting effects (rim lighting, volumetric rays, neon glow)
-   - Motion implications (speed blur, energy trails, burst effects)
-
-5. EMOTIONAL TRIGGER ELEMENTS
-   - Excitement amplifiers (burst rays, energy particles, light flares)
-   - Anticipation builders (countdown elements, mystery shadows)
-   - Premium indicators (luxury textures, refined details, gold accents)
-   - Urgency creators (limited time visuals, exclusive badges)
-
-Transform the context into a complete, actionable prompt that will generate a coming soon poster people can't stop looking at."""
-
-    elif is_testimonial:
-        system_content = """You are an expert prompt enhancer specializing in CONVERSION-OPTIMIZED testimonial designs that build massive trust and drive action. Transform the design plan and knowledge into a powerful prompt for creating testimonials that convert.
-
-Your enhanced prompt must include:
-
-1. TRUST-BUILDING COMPOSITION
-   - Professional layout structure with perfect balance
-   - Visual hierarchy that guides eye flow to key elements
-   - Clean composition that screams credibility
-   - White space utilization for premium feel
-
-2. TESTIMONIAL PRESENTATION MASTERY
-   - Quote formatting with optimal size and emphasis
-   - Attribution placement with perfect prominence
-   - Star rating visual treatment with maximum impact
-   - Supporting elements (badges, logos, certifications) placement
-
-3. COLOR PSYCHOLOGY FOR CONVERSION
-   - Trust-building color palette with exact hex codes
-   - Professional gradient techniques for depth
-   - Accent colors for call-to-action elements
-   - Background colors that enhance readability and credibility
-
-4. CREDIBILITY ENHANCEMENT ELEMENTS
-   - 5-star rating visual optimization
-   - Professional badge and certification styling
-   - Company logo integration with proper sizing
-   - Background texture that enhances rather than distracts
-
-5. READABILITY AND FLOW OPTIMIZATION
-   - Font selection for maximum credibility and readability
-   - Text contrast ratios for perfect accessibility
-   - Visual flow design that leads to action
-   - Mobile-friendly design specifications
-
-6. CONVERSION AMPLIFICATION
-   - Call-to-action button design and placement
-   - Social proof visual amplification
-   - Trust indicator positioning and styling
-   - Overall design that reduces skepticism and builds confidence
-
-Transform the context into a complete, actionable prompt that will generate testimonials with maximum conversion power."""
-
-    else:
-        system_content = """You are an expert prompt enhancer specializing in HIGH-IMPACT visual designs that achieve outstanding results. Transform the design plan and knowledge into a powerful, detailed prompt optimized for creating stunning visuals.
-
-Your enhanced prompt must include:
-
-1. VISUAL IMPACT COMPOSITION
-   - Strategic focal point placement for maximum attention
-   - Dynamic layout structure for professional appeal
-   - Visual hierarchy that guides viewer attention
-   - Balanced composition with purposeful elements
-
-2. PROFESSIONAL TYPOGRAPHY
-   - Font selection with psychological impact
-   - Text hierarchy with perfect proportions
-   - Typography effects for enhanced appeal
-   - Readable yet impactful text treatment
-
-3. COLOR MASTERY
-   - Color palette with exact hex codes for desired mood
-   - Strategic color placement for visual flow
-   - Background and accent color coordination
-   - Professional color combinations for target audience
-
-4. TECHNICAL EXCELLENCE
-   - High-resolution specifications for crisp output
-   - Element spacing for professional appearance
-   - Quality standards for polished finish
-   - Platform optimization considerations
-
-Transform the context into a complete, actionable prompt that produces exceptional visual results."""
-
     payload = {
         "model": PRE_ENHANCER_MODEL,
         "messages": [
             {
                 "role": "system",
-                "content": system_content
+                "content": """You are a assistant you are a prompt enhancer your task is to take input from user like "create coming soon poster for clothing company" or "create testimonial for a restaurant" you need to convert this prompt into detailed examples given below. You must modify prompt according to prompt given by user. you must make sure color and font should same as given by user if not given kindly use it on your own while keeping design principles and fundamentals in your mind.
+
+Don't add custom elements, shapes, and random figures in prompts.
+You must generate a prompt same as given below examples
+
+
+Examples for Coming Soon Pages: -
+
+- Design a clean and elegant coming soon page with a black rectangular border, centered "Coming Soon" text in a cursive font, and a white background using Water Brush font at 60px size.
+- Design a modern coming soon page with a sleek black background, a prominent complex SVG graphic, centered layout, minimalist text, and seamless integration of decorative SVG elements.
+- Design a stylish coming soon page with a soft pink background, golden brown border, cursive "something" in Allura font, and main text in Times New Roman font with heart symbols and website link.
+- Create a coming soon page with a light beige background, dark gray content area featuring large white text for "COMING SOON," a website URL, and a - "GRAND OPENING" button styled in green with custom fonts.
+- Design a natural-themed coming soon page with a dark green background, featuring Bebas Neue font in large size for "Coming" and "soon," a countdown section, and an angled exclamation mark graphic in the bottom right corner.
+- Design a coming soon page with a deep blue background, featuring centrally positioned text in Tektur font (white for 'COMING' with shadow, orange for 'SOON' with shadow), and white lines for definition, all slightly rotated.
+- Design a warm and welcoming coming soon page with a beige background, centered layout, modern font for the title, cursive and bold fonts for 'Coming Soon,' and simple font for a website link, including decorative SVG elements.
+- Design a warm and inviting coming soon page with a light beige background, bold 'COMING SOON' text in a darker brown color, and a date below in 'Open Sans' font.
+- Design a playful coming soon page with a cream background, grid pattern, bold text in warm taupe, cursive text in dark green, and sans-serif font for additional information, ensuring a centered layout for clarity and appeal.
+- Design an elegant coming soon page with beige background, featuring 'LARANA STORE' in bold serif font, 'BEAUTY PRODUCT' in a decorative rectangle, and 'COMING SOON' in red and cursive font, with 'STAY TUNED' and '@REALLYGREATSITE' included, along with whimsical star shapes for a playful touch.
+- Design a bold and modern coming soon page with black background, gray border, large Bebas Neue text for "COMING" and "SOON," decorative Allura font for "-Best Store-" and "Stay Tuned," and a date of 12.12.2025, with clear website link at the bottom.
+- Design a clean coming soon page with a white background, a beige box with a grey border, 'LICERIA & CO.' at the top in large dark blue-grey text, 'WE ARE' below in smaller text, 'OPEN' centered, and 'OPENING HOURS' with hours displayed below.
+- Design a modern and minimalistic coming soon page with a clean white background, featuring centered text in Open Sans font and time indicators styled in dark gray.
+- Design a coming soon page with centered text elements in black color on a soft pink background, featuring the phrases 'NOW WE ARE', 'OPEN', and 'VISIT OUR SITE' with specific font styles and sizes. Include a website link at the bottom in a regular font.
+
+Examples for Testimonial Designs: -
+
+
+- Design a testimonial graphic with a teal background, featuring a beige square container with "TESTIMONIAL" in bold Alfarn font, three orange circles below, PT Serif font for customer experience lines, and square quotation marks for visual appeal.,
+- Design a testimonial with a white background, a large pink circle in the center, testimonial text in Raleway font, customer's name at the bottom, and decorative elements like 4-spoke stars and a dotted circle.,
+- Create a testimonial with a cream background, black quotation marks, centered title "Testimonial," testimonial text "We couldn't be happier with the outstanding service provided by Weblake Company...," author name "- Linda Brown -" centered below, and website URL "a.barnescopy.site.com" at the bottom in Instrument Serif font.,
+- Design a testimonial with a neon green header, black background, and round corner speech box, featuring the title "CLIENT TESTIMONIAL" in Bebas Neue font at 80px, testimonial text in Neue font at 42px, and name "MIHIR GEHLOT" in Raleway font at 36px, all centered and styled accordingly.,
+- Design a testimonial with a blue background and a light blue header, featuring a bold "Testimonial" title in orange Abril Fatface font, followed by a warm message in Raleway font within a white speech box with rounded corners. Include the website URL in PT Serif font at the bottom.,
+- Design a testimonial with yellow background, a central white text box with dotted border, Lato font for main message, Montserrat font for name "Olivia Wilson," and a blue underline, without an image.,
+- Create a testimonial with a mint green background, featuring a bold red "CLIENT FEEDBACK" title at the top, a white rounded rectangle for the testimonial text, and include the customer name "OLIVIA WILSON" with five blue stars for a 5-star rating.,
+- Design a testimonial with a centered title "CLIENT REVIEWS" in bold Courier Std font, italic Coromont Garamond text in a dark gray container, and five gold stars for rating, all on a clean white background.,
+- Design a testimonial with Viaboda Libre title and Playfair Display font for positive feedback by "Rakhi Sawant," with left and right quote SVGs on a pale yellow background.,
+- Design a testimonial with a blue background and a light blue header, featuring a bold "Testimonial" title in orange Abril Fatface font, followed by a warm message in Raleway font within a white speech box with rounded corners. Include the website URL in PT Serif font at the bottom.,
+"""
             },
             {
                 "role": "user",
                 "content": user_input
             }
         ],
-        "temperature": 0.8,
-        "max_tokens": 1800
+        "temperature": 1,
+        "max_tokens": 4000
     }
 
     logger.info(f"Calling OpenAI Chat API for initial prompt enhancement with model: {PRE_ENHANCER_MODEL}")
@@ -618,7 +367,7 @@ Transform the context into a complete, actionable prompt that produces exception
     return enhanced_prompt
 
 def enhance_prompt_with_chat(user_input):
-    """Enhance user prompt using Chat Completions API"""
+    """Enhance user prompt using Chat Completions API with proven quality requirements"""
     url = OPENAI_CHAT_ENDPOINT
     headers = {
         "Content-Type": "application/json",
@@ -630,44 +379,33 @@ def enhance_prompt_with_chat(user_input):
         "messages": [
             {
                 "role": "system",
-                "content": """You are an advanced SVG design prompt optimizer specializing in high-impact posters and logo creation. Enhance the pre-enhanced design prompt to ensure the resulting SVG is visually stunning, cohesive, and technically precise.
+                "content": """You are a prompt enhancer assistant. You transform simple, brief prompts into detailed,
+                comprehensive prompts that provide specific details, requirements, and context to help generate better results.
+                
+                For both coming soon pages and testimonial designs, ensure you include specific details about:
+                - Layout and positioning
+                - Font choices, sizes, and styles
+                - Color schemes and background designs
+                - Decorative elements and their placement
+                - Text content and hierarchy
+                - Spacing and alignment
 
-Your optimization should address:
-1. Vector and Visual Optimization
-   - Emphasize vector-friendly shapes, paths, and curves
-   - Define gradients, patterns, and textures for backgrounds
-   - Recommend shadows, overlays, and depth for visual appeal
-
-2. Technical Precision
-   - Exact dimensions, positions, and aspect ratios
-   - Precise color values (HEX/RGB) with contrast considerations
-   - Font specifications, including web-safe fallbacks and loading strategies
-
-3. Component and Layer Organization
-   - Grouping of elements for reuse and clarity
-   - IDs and classes for styling and interactivity
-   - Organized layering to control visual stacking and effects
-
-4. Performance and Accessibility
-   - Optimize paths to minimize file size and complexity
-   - Ensure responsive scaling and cross-browser performance
-   - Add ARIA labels and semantic structure for accessibility
-
-5. Poster and Branding Details
-   - Specify background elements (colors, gradients, patterns)
-   - Suggest lighting, shadow, and texture to create depth
-   - Recommend cohesive color themes and mood descriptors
-   - Integrate logo placement and branding cues
-
-Ensure the final prompt guides the SVG generator to produce a complete, eye-catching poster or logo design with a well-defined background, color theme, and professional quality."""
+                
+                Add these requirements at the end of each prompt:
+                'Compulsory in you use create good svg code must meaningfull and good and also usable for user ok msut look good'
+                'Compulsory in you use any color must make sense and text color and and all continer bg color must visible togther'
+                'Compulsory in This must you make all svg code must be center align in good aligmnet'
+                'Compulsory IN THIS FETCH FONT USING LINK AND FONT FACE BOTH
+                'Compulsory IN THIS ALIGMENT MUST BE GOOD AND GOOD LOOKING"
+                '"""
             },
             {
                 "role": "user",
                 "content": user_input
             }
         ],
-        "temperature": 0.7,
-        "max_tokens": 2000
+        "temperature": 1,
+        "max_tokens": 4000
     }
 
     logger.info(f"Calling OpenAI Chat API for prompt enhancement with model: {PROMPT_ENHANCER_MODEL}")
