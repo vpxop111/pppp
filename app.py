@@ -1575,7 +1575,7 @@ Return only the combined SVG code."""
             }
         ],
         "temperature": 0.3,
-        "max_tokens": 3000
+        "max_tokens": 8000
     }
 
     try:
