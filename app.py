@@ -1533,7 +1533,7 @@ Return ONLY the SVG code without any explanations or comments."""
             {"role": "user", "content": user_content}
         ],
         "temperature": 1,
-        "max_tokens":  80000
+        "max_tokens": 20000
     }
     
     url = "https://api.openai.com/v1/chat/completions"
@@ -1593,7 +1593,7 @@ Provide a detailed description that could be used to recreate just the backgroun
                 {"role": "user", "content": user_content}
             ],
             "temperature": 1,
-            "max_tokens":  10000
+            "max_tokens":  6000
         }
         
         url = "https://api.openai.com/v1/chat/completions"
@@ -1753,7 +1753,7 @@ Return the complete SVG with only that first path removed, keeping everything el
             }
         ],
         "temperature": 1,
-        "max_tokens": 80000
+        "max_tokens": 20000
     }
 
     try:
@@ -1860,7 +1860,7 @@ Return only the combined SVG code with proper layering."""
             }
         ],
         "temperature": 1,
-        "max_tokens": 80000
+        "max_tokens": 20000
     }
 
     try:
