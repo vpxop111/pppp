@@ -51,6 +51,31 @@ STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
 IMAGES_DIR = os.path.join(STATIC_DIR, 'images')
 os.makedirs(IMAGES_DIR, exist_ok=True)
 
+# Public URL configuration for deployed environment
+def get_public_base_url():
+    """Get the public base URL for serving images"""
+    # Check if we're in production (Render deployment)
+    if os.getenv('PORT'):
+        # Production environment - use the deployed URL
+        return 'https://pppp-351z.onrender.com'
+    else:
+        # Local development environment
+        return 'http://localhost:5000'
+
+def get_public_image_url(relative_path):
+    """Convert relative image path to public URL"""
+    base_url = get_public_base_url()
+    # Ensure the path starts with /static/images/
+    if not relative_path.startswith('/static/images/'):
+        if relative_path.startswith('static/images/'):
+            relative_path = '/' + relative_path
+        elif relative_path.startswith('sessions/'):
+            relative_path = '/static/images/' + relative_path
+        else:
+            relative_path = '/static/images/' + relative_path
+    
+    return f"{base_url}{relative_path}"
+
 # API keys
 OPENAI_API_KEY_ENHANCER = os.getenv('OPENAI_API_KEY_ENHANCER')
 OPENAI_API_KEY_SVG = os.getenv('OPENAI_API_KEY_SVG')
@@ -66,13 +91,13 @@ OPENAI_API_BASE = "https://api.openai.com/v1"
 OPENAI_CHAT_ENDPOINT = f"{OPENAI_API_BASE}/chat/completions"
 
 # Model names - updated to use GPT-4.1 mini for logic/text and gpt-image for images
-PLANNER_MODEL = "gpt-4.1-nano"
-DESIGN_KNOWLEDGE_MODEL = "gpt-4.1-nano"
-PRE_ENHANCER_MODEL = "gpt-4.1-nano"
-PROMPT_ENHANCER_MODEL = "gpt-4.1-nano"
+PLANNER_MODEL = "gpt-4.1-mini"
+DESIGN_KNOWLEDGE_MODEL = "gpt-4.1-mini"
+PRE_ENHANCER_MODEL = "gpt-4.1-mini"
+PROMPT_ENHANCER_MODEL = "gpt-4.1-mini"
 GPT_IMAGE_MODEL = "gpt-image-1"
-SVG_GENERATOR_MODEL = "gpt-4.1-nano"
-CHAT_ASSISTANT_MODEL = "gpt-4.1-nano"
+SVG_GENERATOR_MODEL = "gpt-4.1-mini"
+CHAT_ASSISTANT_MODEL = "gpt-4.1-mini"
 
 # Add parallel SVG processing imports
 from concurrent.futures import ThreadPoolExecutor
@@ -89,7 +114,11 @@ except ImportError as e:
     logger.warning(f"Parallel SVG features not available: {e}")
     PARALLEL_FEATURES_AVAILABLE = False
 
-# Add after existing directory setup
+# Unified storage directory - ALL files go here in organized sessions
+UNIFIED_STORAGE_DIR = os.path.join(IMAGES_DIR, 'sessions')
+os.makedirs(UNIFIED_STORAGE_DIR, exist_ok=True)
+
+# Legacy parallel directory (kept for backward compatibility)
 PARALLEL_OUTPUTS_DIR = os.path.join(IMAGES_DIR, 'parallel')
 os.makedirs(PARALLEL_OUTPUTS_DIR, exist_ok=True)
 
@@ -132,7 +161,7 @@ Provide guidance if the request isn't suitable."""
             }
         ],
         "temperature": 0.7,
-        "max_tokens": 500
+        "max_tokens": 5000
     }
 
     response = requests.post(url, headers=headers, json=payload)
@@ -206,7 +235,7 @@ Focus on creating a practical, implementable plan with specific details that can
             }
         ],
         "temperature": 0.8,
-        "max_tokens": 1200
+        "max_tokens":  6000
     }
 
     response = requests.post(url, headers=headers, json=payload)
@@ -278,7 +307,7 @@ Focus on providing concrete, implementable advice that will directly improve des
             }
         ],
         "temperature": 0.8,
-        "max_tokens": 1800
+        "max_tokens": 18000
     }
 
     response = requests.post(url, headers=headers, json=payload)
@@ -362,7 +391,7 @@ Transform the user's request into this comprehensive format while maintaining de
             }
         ],
         "temperature": 1,
-        "max_tokens": 4000
+        "max_tokens":  6000
     }
 
     logger.info(f"Calling OpenAI Chat API for initial prompt enhancement with model: {PRE_ENHANCER_MODEL}")
@@ -439,7 +468,7 @@ Transform the design description into a comprehensive SVG specification that wil
             }
         ],
         "temperature": 1,
-        "max_tokens": 4000
+        "max_tokens": 20000
     }
 
     logger.info(f"Calling OpenAI Chat API for prompt enhancement with model: {PROMPT_ENHANCER_MODEL}")
@@ -589,7 +618,7 @@ Return ONLY the enhanced prompt optimized for GPT Image-1, no explanations."""
             }
         ],
         "temperature": 0.8,
-        "max_tokens": 800
+        "max_tokens": 20000
     }
 
     try:
@@ -636,11 +665,18 @@ def generate_image_with_gpt(enhanced_prompt, design_context=None):
         # The response structure changed in newer versions of the API
         image_base64 = response.data[0].b64_json if hasattr(response.data[0], 'b64_json') else response.data[0].url
 
+        # Create session ID for this generation
+        session_id = f"svg_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+        
         # Save the generated image
-        filename = save_image(image_base64, prefix="gpt_image")
+        filename, relative_path, _ = save_image(image_base64, prefix="gpt_image", session_id=session_id)
+        
+        # Create public URL for the image
+        public_url = get_public_image_url(relative_path)
 
         logger.info("Image generated and saved successfully with GPT Image-1")
-        return image_base64, filename
+        logger.info(f"Public URL created: {public_url}")
+        return image_base64, relative_path, public_url
     except Exception as e:
         logger.error(f"Error generating image with GPT Image-1: {str(e)}")
         raise
@@ -685,41 +721,61 @@ def clean_svg_code_original(svg_code):
         logger.error(f"Error cleaning SVG: {str(error)}")
         return svg_code
 
-def save_image(image_data, prefix="img", format="PNG"):
-    """Save image data to file and return the filename"""
+def save_image(image_data, prefix="img", format="PNG", session_id=None):
+    """Save image data to unified storage folder and return the filename"""
     try:
         # Generate unique filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         unique_id = str(uuid.uuid4())[:8]
         filename = f"{prefix}_{timestamp}_{unique_id}.{format.lower()}"
-        filepath = os.path.join(IMAGES_DIR, filename)
+        
+        # Use session_id if provided, otherwise create one
+        if not session_id:
+            session_id = f"session_{timestamp}_{uuid.uuid4().hex[:8]}"
+        
+        # All files go to unified storage with session organization
+        session_folder = os.path.join(UNIFIED_STORAGE_DIR, session_id)
+        os.makedirs(session_folder, exist_ok=True)
+        filepath = os.path.join(session_folder, filename)
 
         # Convert base64 to image and save
         image_bytes = base64.b64decode(image_data)
         image = Image.open(BytesIO(image_bytes))
         image.save(filepath, format=format)
         
-        logger.info(f"Image saved successfully: {filename}")
-        return filename
+        # Return relative path from IMAGES_DIR
+        relative_path = os.path.relpath(filepath, IMAGES_DIR)
+        logger.info(f"Image saved successfully: {filename} in session {session_id}")
+        return filename, relative_path, session_id
     except Exception as e:
         logger.error(f"Error saving image: {str(e)}")
         raise
 
-def save_svg(svg_code, prefix="svg"):
-    """Save SVG code to file and return the filename"""
+def save_svg(svg_code, prefix="svg", session_id=None):
+    """Save SVG code to unified storage folder and return the filename"""
     try:
         # Generate unique filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         unique_id = str(uuid.uuid4())[:8]
         filename = f"{prefix}_{timestamp}_{unique_id}.svg"
-        filepath = os.path.join(IMAGES_DIR, filename)
+        
+        # Use session_id if provided, otherwise create one
+        if not session_id:
+            session_id = f"session_{timestamp}_{uuid.uuid4().hex[:8]}"
+        
+        # All files go to unified storage with session organization
+        session_folder = os.path.join(UNIFIED_STORAGE_DIR, session_id)
+        os.makedirs(session_folder, exist_ok=True)
+        filepath = os.path.join(session_folder, filename)
 
         # Save SVG code to file
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(svg_code)
         
-        logger.info(f"SVG saved successfully: {filename}")
-        return filename
+        # Return relative path from IMAGES_DIR
+        relative_path = os.path.relpath(filepath, IMAGES_DIR)
+        logger.info(f"SVG saved successfully: {filename} in session {session_id}")
+        return filename, relative_path, session_id
     except Exception as e:
         logger.error(f"Error saving SVG: {str(e)}")
         raise
@@ -728,33 +784,55 @@ def convert_svg_to_png(svg_code):
     """Convert SVG code to PNG and save both files"""
     try:
         # Save SVG file
-        svg_filename = save_svg(svg_code)
+        svg_filename, svg_relative_path, session_id = save_svg(svg_code)
         
         # Convert to PNG using cairosvg
         png_data = cairosvg.svg2png(bytestring=svg_code.encode('utf-8'))
         
-        # Save PNG file
-        png_filename = save_image(
+        # Save PNG file in the same session as SVG
+        png_filename, png_relative_path, _ = save_image(
             base64.b64encode(png_data).decode('utf-8'),
             prefix="converted_svg",
-            format="PNG"
+            format="PNG",
+            session_id=session_id
         )
         
-        return svg_filename, png_filename
+        return svg_relative_path, png_relative_path
     except Exception as e:
         logger.error(f"Error in SVG to PNG conversion: {str(e)}")
         raise
 
 @app.route('/static/images/<path:filename>')
 def serve_image(filename):
-    """Serve images from the images directory"""
-    return send_from_directory(IMAGES_DIR, filename)
+    """Serve images from the images directory with subfolder support"""
+    # Handle both direct files and files in subfolders
+    filepath = os.path.join(IMAGES_DIR, filename)
+    
+    # Security check - ensure the path is within IMAGES_DIR
+    if not os.path.abspath(filepath).startswith(os.path.abspath(IMAGES_DIR)):
+        return "Access denied", 403
+    
+    # Extract directory and filename
+    directory = os.path.dirname(filepath)
+    basename = os.path.basename(filepath)
+    
+    return send_from_directory(directory, basename)
 
 @app.route('/static/images/parallel/<path:session_folder>/<path:filename>')
 def serve_parallel_image(session_folder, filename):
-    """Serve images from the parallel pipeline directory"""
+    """Serve images from the parallel pipeline directory (legacy)"""
     parallel_path = os.path.join(PARALLEL_OUTPUTS_DIR, session_folder)
     return send_from_directory(parallel_path, filename)
+
+@app.route('/static/images/sessions/<path:session_id>/<path:filename>')
+def serve_session_file(session_id, filename):
+    """Serve files from the unified sessions directory"""
+    # Security check - ensure the path is within UNIFIED_STORAGE_DIR
+    session_path = os.path.join(UNIFIED_STORAGE_DIR, session_id)
+    if not os.path.abspath(session_path).startswith(os.path.abspath(UNIFIED_STORAGE_DIR)):
+        return "Access denied", 403
+    
+    return send_from_directory(session_path, filename)
 
 @app.route('/api/projects/templates', methods=['GET'])
 def get_templates():
@@ -875,8 +953,8 @@ Original Request:
         svg_code = generate_svg_from_image(gpt_image_base64, prompt_to_use)
         logger.info("SVG code generated from image")
         
-        # Save the SVG
-        svg_filename = save_svg(svg_code, prefix="svg")
+        # Save the SVG in the same session
+        svg_filename, svg_relative_path, _ = save_svg(svg_code, prefix="svg", session_id=session_id)
 
         return jsonify({
             "original_prompt": user_input,
@@ -885,7 +963,7 @@ Original Request:
             "gpt_image_base64": gpt_image_base64,
             "gpt_image_url": f"/static/images/{gpt_image_filename}",
             "svg_code": svg_code,
-            "svg_path": svg_filename,
+            "svg_path": svg_relative_path,
             "stages": {
                 "vector_suitability": {
                     "completed": True,
@@ -915,7 +993,7 @@ Original Request:
                 },
                 "svg_generation": {
                     "completed": True, 
-                    "svg_path": svg_filename
+                    "svg_path": svg_relative_path
                 }
             },
             "progress": 100
@@ -989,7 +1067,7 @@ Current context: You are helping a user with their design project."""
             model=CHAT_ASSISTANT_MODEL,
             messages=ai_messages,
             temperature=0.7,
-            max_tokens=1000
+            max_tokens=20000
         )
         
         # Extract the response content safely
@@ -1039,8 +1117,8 @@ The SVG should be production-ready and properly formatted."""
                 "content": f"Original SVG:\n```svg\n{original_svg}\n```\n\nModification request: {modification_request}\n\nPlease provide the modified SVG:"
             }
         ],
-        "temperature": 0.3,
-        "max_tokens": 2000
+        "temperature": 1,
+        "max_tokens": 20000
     }
 
     logger.info("Calling AI for SVG modification")
@@ -1113,6 +1191,9 @@ def chat_assistant():
             logger.info("-"*50)
             
             try:
+                # Create session ID for this chat conversation
+                chat_session_id = f"chat_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+                
                 # Stage 1: Planning Phase
                 logger.info("\n[STAGE 1: Planning Phase]")
                 logger.info("-"*50)
@@ -1172,7 +1253,7 @@ def chat_assistant():
                 logger.info("Converting design to SVG format...")
                 logger.info(f"Using model: {SVG_GENERATOR_MODEL}")
                 svg_code = generate_svg_from_image(image_base64, enhanced_prompt)
-                svg_filename = save_svg(svg_code, prefix="assistant_svg")
+                svg_filename, svg_relative_path, _ = save_svg(svg_code, prefix="assistant_svg", session_id=chat_session_id)
                 logger.info(f"SVG generated and saved as: {svg_filename}")
                 
                 # Stage 7: Design Explanation
@@ -1199,7 +1280,7 @@ def chat_assistant():
                 response_data = {
                     "response": full_response,
                     "svg_code": svg_code,
-                    "svg_path": svg_filename,
+                    "svg_path": svg_relative_path,
                     "messages": messages
                 }
                 
@@ -1230,8 +1311,11 @@ def chat_assistant():
                 modified_svg = modify_svg_with_ai(current_svg, latest_message)
                 
                 if modified_svg and modified_svg != current_svg:
+                    # Create session ID for modification
+                    mod_session_id = f"mod_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+                    
                     # Save the modified SVG
-                    svg_filename = save_svg(modified_svg, prefix="modified_svg")
+                    svg_filename, svg_relative_path, _ = save_svg(modified_svg, prefix="modified_svg", session_id=mod_session_id)
                     
                     # Get AI explanation of the changes
                     change_explanation_prompt = f"I've modified the design based on the user's request: '{latest_message}'. Here's the updated SVG:\n\n```svg\n{modified_svg}\n```\n\nPlease explain what changes were made and how the design now better meets their needs."
@@ -1246,7 +1330,7 @@ def chat_assistant():
                     response_data = {
                         "response": full_response,
                         "svg_code": modified_svg,
-                        "svg_path": svg_filename,
+                        "svg_path": svg_relative_path,
                         "messages": messages
                     }
                     logger.info("Successfully modified design with explanation")
@@ -1385,7 +1469,7 @@ Create a final prompt that will generate exceptional professional visuals."""
             }
         ],
         "temperature": 0.7,
-        "max_tokens": 1000
+        "max_tokens": 20000
     }
 
     try:
@@ -1449,7 +1533,7 @@ Return ONLY the SVG code without any explanations or comments."""
             {"role": "user", "content": user_content}
         ],
         "temperature": 1,
-        "max_tokens": 2000
+        "max_tokens": 20000
     }
     
     url = "https://api.openai.com/v1/chat/completions"
@@ -1472,11 +1556,118 @@ Return ONLY the SVG code without any explanations or comments."""
     svg_code = match.group(0) if match else content.strip()
     
     # Save and return
-    svg_filename = save_svg(svg_code, prefix='text_svg')
-    return svg_code, svg_filename
+    svg_filename, svg_relative_path, session_id = save_svg(svg_code, prefix='text_svg')
+    return svg_code, svg_relative_path
+
+def process_background_extraction(image_data):
+    """Extract background using GPT-4.1-mini vision to analyze and recreate background"""
+    if not PARALLEL_FEATURES_AVAILABLE:
+        raise NotImplementedError("Parallel features not available - missing dependencies")
+    
+    logger.info("Starting background extraction using GPT-4.1-mini vision...")
+    
+    try:
+        # Base64-encode the PNG image for vision analysis
+        img_b64 = base64.b64encode(image_data).decode('utf-8')
+        
+        # First, analyze the background with GPT-4.1-mini vision
+        system_prompt = """You are an expert image analyst. Analyze the provided image and describe ONLY the background elements in great detail. Focus on:
+- Background colors, patterns, textures, gradients
+- Background shapes, borders, frames
+- Any background design elements that are NOT text or main graphic elements
+- Color codes, patterns, and textures used for the background
+- Lighting, shadows, and atmospheric effects in the background
+
+Provide a detailed description that could be used to recreate just the background portion."""
+
+        user_content = [
+            {"type": "text", "text": "Analyze this image and describe only the background elements in detail, ignoring all text and main graphic elements."},
+            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_b64}"}}
+        ]
+        
+        # Call GPT-4.1-mini for background analysis
+        payload = {
+            "model": "gpt-4.1-mini",
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content}
+            ],
+            "temperature": 1,
+            "max_tokens":  6000
+        }
+        
+        url = "https://api.openai.com/v1/chat/completions"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {OPENAI_API_KEY_SVG}"
+        }
+        
+        logger.info("Analyzing background with GPT-4.1-mini vision...")
+        response = requests.post(url, headers=headers, json=payload)
+        analysis_data = response.json()
+        
+        if response.status_code != 200:
+            logger.error(f"Error analyzing background: {analysis_data}")
+            raise Exception("Background analysis failed")
+        
+        background_description = analysis_data["choices"][0]["message"]["content"]
+        logger.info(f"Background analysis: {background_description[:200]}...")
+        
+        # Now use GPT Image-1 to generate background based on description
+        background_generation_prompt = f"Create a clean background based on this description: {background_description}. The background should be 1024x1024 pixels, without any text, icons, or graphic elements - just the background pattern, colors, and textures described."
+        
+        logger.info("Generating background with GPT Image-1...")
+        response = openai.images.generate(
+            model=GPT_IMAGE_MODEL,
+            prompt=background_generation_prompt,
+            size="1024x1024",
+            quality="low"
+        )
+        
+        # Get the background-only image
+        background_base64 = response.data[0].b64_json if hasattr(response.data[0], 'b64_json') else response.data[0].url
+        
+        # Handle URL vs base64 response
+        if background_base64.startswith('http'):
+            # If we got a URL, download the image
+            import urllib.request
+            temp_path = f"temp_bg_{uuid.uuid4().hex[:8]}.png"
+            urllib.request.urlretrieve(background_base64, temp_path)
+            # Read it back to get base64
+            with open(temp_path, 'rb') as f:
+                background_bytes = f.read()
+            background_base64 = base64.b64encode(background_bytes).decode('utf-8')
+            os.remove(temp_path)  # Clean up temp file
+        
+        # Create session and save to unified storage
+        session_id = f"bg_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+        background_filename, background_relative_path, _ = save_image(background_base64, prefix="background", session_id=session_id)
+        background_full_path = os.path.join(IMAGES_DIR, background_relative_path)
+        
+        # Create public URL for the background
+        background_public_url = get_public_image_url(background_relative_path)
+        
+        logger.info(f"Background extracted and saved: {background_filename}")
+        logger.info(f"Background public URL: {background_public_url}")
+        return background_base64, background_filename, background_full_path, background_public_url
+        
+    except Exception as e:
+        logger.error(f"Error in background extraction: {str(e)}")
+        # Fallback: return original image as background using unified storage
+        image_base64 = base64.b64encode(image_data).decode('utf-8')
+        session_id = f"bgfb_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+        fallback_filename, fallback_relative_path, _ = save_image(image_base64, prefix="background_fallback", session_id=session_id)
+        fallback_full_path = os.path.join(IMAGES_DIR, fallback_relative_path)
+        
+        # Create public URL for fallback
+        fallback_public_url = get_public_image_url(fallback_relative_path)
+        
+        logger.warning("Using original image as background fallback")
+        logger.info(f"Fallback background public URL: {fallback_public_url}")
+        return image_base64, fallback_filename, fallback_full_path, fallback_public_url
 
 def process_clean_svg(image_data):
-    """Process text removal and convert to clean SVG"""
+    """Process text AND background removal and convert to clean SVG (elements only)"""
     if not PARALLEL_FEATURES_AVAILABLE:
         raise NotImplementedError("Parallel features not available - missing dependencies")
     
@@ -1488,12 +1679,15 @@ def process_clean_svg(image_data):
 
     try:
         # Remove text from the image using remove_text_simple
-        edited_png_path = remove_text_simple.remove_text(temp_input_path)
+        # This will be our elements-only image (text removed, but background may still be present)
+        # V-Tracer will handle the vectorization and naturally isolate the vector elements
+        final_edited_path = remove_text_simple.remove_text(temp_input_path)
+        logger.info("Text removed from image, proceeding with V-Tracer for element isolation...")
 
-        # Convert the edited PNG to SVG using vtracer with optimized settings
-        output_svg_path = os.path.join(IMAGES_DIR, f"clean_{timestamp}_{uuid.uuid4().hex[:8]}.svg")
+        # Convert the final edited PNG to SVG using vtracer with optimized settings
+        output_svg_path = os.path.join(IMAGES_DIR, f"elements_{timestamp}_{uuid.uuid4().hex[:8]}.svg")
         vtracer.convert_image_to_svg_py(
-            edited_png_path,
+            final_edited_path,
             output_svg_path,
             colormode='color',
             hierarchical='stacked',
@@ -1512,15 +1706,16 @@ def process_clean_svg(image_data):
         with open(output_svg_path, 'r', encoding='utf-8') as f:
             svg_code = f.read()
 
-        return svg_code, os.path.basename(output_svg_path), edited_png_path
+        return svg_code, os.path.basename(output_svg_path), final_edited_path
     finally:
-        # Clean up temporary file
-        if os.path.exists(temp_input_path):
-            os.remove(temp_input_path)
+        # Clean up temporary files
+        for temp_file in [temp_input_path]:
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
 
-def ai_combine_svgs(text_svg_code, traced_svg_code):
-    """AI-powered combination of text and traced SVGs using OpenAI GPT-4.1-nano"""
-    logger.info("Using AI to intelligently combine SVGs...")
+def post_process_svg_remove_first_path(svg_code):
+    """Post-process the combined SVG using OpenAI gpt-4.1-mini to remove the first path tag after elements-layer"""
+    logger.info("Post-processing SVG to remove first path in elements-layer using OpenAI...")
     
     url = OPENAI_CHAT_ENDPOINT
     headers = {
@@ -1528,42 +1723,25 @@ def ai_combine_svgs(text_svg_code, traced_svg_code):
         "Authorization": f"Bearer {OPENAI_API_KEY_SVG}"
     }
 
-    system_prompt = """You are an expert SVG designer and combiner. Your task is to intelligently combine two SVG files:
-1. A text-focused SVG (contains text elements extracted from an image)
-2. A traced/background SVG (contains the visual graphics without text)
+    system_prompt = """You are an expert SVG editor. Your task is to modify SVG code by removing ONLY the first <path> tag that appears after the <g id="elements-layer"> tag.
 
-Your goal is to create a single, perfectly combined SVG that:
-- Maintains proper layering (background graphics behind, text on top)
-- Ensures optimal positioning and alignment
-- Preserves all visual elements from both SVGs
-- Uses appropriate opacity and blending for visual harmony
-- Creates a cohesive, professional design
-- Maintains proper SVG structure and dimensions (1080x1080)
-- Uses semantic grouping with descriptive IDs
-- Ensures text readability over background elements
+Instructions:
+1. Find the <g id="elements-layer"> tag in the SVG
+2. Remove ONLY the FIRST <path> tag that appears inside this elements-layer group
+3. Keep all other path tags and all other elements unchanged
+4. Maintain the exact same SVG structure, formatting, and all other content
+5. Do not modify any other parts of the SVG
 
-Guidelines:
-- Analyze both SVGs carefully before combining
-- Preserve the integrity of text elements (fonts, sizes, positions)
-- Maintain the visual appeal of background graphics
-- Use proper layering with <g> groups
-- Apply subtle opacity adjustments if needed for text readability
-- Ensure the combined result looks professional and cohesive
+CRITICAL: Your response must contain ONLY the complete modified SVG code. Start immediately with <svg and end with </svg>. Do not include any explanations, comments, markdown formatting, or any other text whatsoever. The response must be purely valid SVG code that can be directly used."""
 
-ABSOLUTELY CRITICAL: Your response must contain ONLY the complete SVG code. Start immediately with <svg and end with </svg>. Do not include any explanations, comments, markdown formatting, or any other text whatsoever. The response must be purely valid SVG code that can be directly used without any processing."""
+    user_prompt = f"""Remove ONLY the first <path> tag inside the <g id="elements-layer"> group from this SVG:
 
-    user_prompt = f"""Combine these two SVGs intelligently:
+{svg_code}
 
-TEXT SVG (contains text elements):
-{text_svg_code}
-
-BACKGROUND/TRACED SVG (contains graphics/shapes):
-{traced_svg_code}
-
-Return only the combined SVG code. must you return full svg code"""
+Return the complete SVG with only that first path removed, keeping everything else exactly the same."""
 
     payload = {
-        "model": "gpt-4.1-nano",
+        "model": "gpt-4.1-mini",
         "messages": [
             {
                 "role": "system",
@@ -1579,14 +1757,121 @@ Return only the combined SVG code. must you return full svg code"""
     }
 
     try:
-        logger.info("Calling OpenAI for intelligent SVG combination...")
+        logger.info("Calling OpenAI to remove first path in elements-layer...")
         response = requests.post(url, headers=headers, json=payload)
         response_data = response.json()
 
         if response.status_code != 200:
-            logger.error(f"OpenAI API error for SVG combination: {response_data}")
+            logger.error(f"OpenAI API error for SVG post-processing: {response_data}")
+            # Return original SVG if API call fails
+            return svg_code
+
+        ai_response = response_data["choices"][0]["message"]["content"]
+        
+        # Log the response for debugging
+        logger.info(f"AI post-processing response length: {len(ai_response)}")
+        logger.info("AI successfully post-processed SVG - first path removed from elements-layer")
+        
+        # Return the AI response directly
+        processed_svg = ai_response.strip()
+        return processed_svg
+            
+    except Exception as e:
+        logger.error(f"Error in SVG post-processing: {str(e)}")
+        # Return original SVG if processing fails
+        return svg_code
+
+def ai_combine_svgs(text_svg_code, elements_svg_code, background_image_url=None):
+    """AI-powered combination of text, elements SVGs and background image using OpenAI gpt-4.1-mini"""
+    logger.info("Using AI to intelligently combine 3-layer SVG (background + elements + text)...")
+    
+    url = OPENAI_CHAT_ENDPOINT
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {OPENAI_API_KEY_SVG}"
+    }
+
+    system_prompt = """You are an expert SVG designer and combiner. Your task is to intelligently combine THREE components into a single professional SVG:
+1. A text-focused SVG (contains text elements extracted from an image)
+2. An elements SVG (contains isolated visual graphics/shapes without text or background)
+3. A background image (provided as URL to be embedded as image element)
+
+Your goal is to create a single, perfectly combined SVG with proper 3-layer structure:
+- LAYER 1 (bottom): Background image element using href URL
+- LAYER 2 (middle): Visual elements/graphics SVG paths
+- LAYER 3 (top): Text elements SVG
+
+
+
+Requirements:
+- Maintains proper layering with correct z-index ordering
+- Ensures optimal positioning and alignment of all layers
+- Preserves all visual elements from each component
+- Uses appropriate opacity and blending for visual harmony
+- Creates a cohesive, professional design
+- Maintains proper SVG structure and dimensions (1080x1080)
+- Uses semantic grouping with descriptive IDs for each layer
+- Ensures text readability over background and elements
+- Embeds background as <image href="URL"> element with proper positioning
+
+Guidelines:
+- Create 3 distinct <g> groups: "background-layer", "elements-layer", "text-layer"
+- Background image should use href attribute with the provided URL
+- Background should fill viewBox appropriately (x="0" y="0" width="1080" height="1080")
+- Elements should be positioned to work with background
+- Text should have sufficient contrast and readability
+- Apply subtle opacity adjustments if needed for layer harmony
+- Ensure proper SVG namespace and viewBox settings
+
+ABSOLUTELY CRITICAL: Your response must contain ONLY the complete SVG code. Start immediately with <svg and end with </svg>. Do not include any explanations, comments, markdown formatting, or any other text whatsoever. The response must be purely valid SVG code that can be directly used without any processing."""
+
+    # Prepare background image reference
+    background_ref = ""
+    if background_image_url:
+        background_ref = f"Background image URL: {background_image_url} (embed as <image href=\"{background_image_url}\"> element)"
+
+    user_prompt = f"""Combine these THREE components into a single professional SVG with proper layering:
+
+TEXT SVG (contains text elements - TOP LAYER):
+{text_svg_code}
+
+ELEMENTS SVG (contains isolated graphics/shapes - MIDDLE LAYER):
+{elements_svg_code}
+
+{background_ref}
+
+Create a 3-layer SVG structure:
+1. Background layer with <image href="{background_image_url}"> element (x="0" y="0" width="1080" height="1080")
+2. Elements layer with graphics from elements SVG
+3. Text layer with text from text SVG
+
+Return only the combined SVG code with proper layering."""
+
+    payload = {
+        "model": "gpt-4.1-mini",
+        "messages": [
+            {
+                "role": "system",
+                "content": system_prompt
+            },
+            {
+                "role": "user", 
+                "content": user_prompt
+            }
+        ],
+        "temperature": 1,
+        "max_tokens": 20000
+    }
+
+    try:
+        logger.info("Calling OpenAI for intelligent 3-layer SVG combination...")
+        response = requests.post(url, headers=headers, json=payload)
+        response_data = response.json()
+
+        if response.status_code != 200:
+            logger.error(f"OpenAI API error for 3-layer SVG combination: {response_data}")
             # Fallback to simple combination
-            return simple_combine_svgs_fallback(text_svg_code, traced_svg_code)
+            return simple_combine_svgs_fallback(text_svg_code, elements_svg_code, background_image_url)
 
         ai_response = response_data["choices"][0]["message"]["content"]
         
@@ -1596,27 +1881,27 @@ Return only the combined SVG code. must you return full svg code"""
         
         # Return the AI response directly without any extraction logic
         combined_svg = ai_response.strip()
-        logger.info("AI successfully combined SVGs - returning direct response")
+        logger.info("AI successfully combined 3-layer SVG - returning direct response")
         return combined_svg
             
     except Exception as e:
-        logger.error(f"Error in AI SVG combination: {str(e)}")
+        logger.error(f"Error in AI 3-layer SVG combination: {str(e)}")
         # Fallback to simple combination
-        return simple_combine_svgs_fallback(text_svg_code, traced_svg_code)
+        return simple_combine_svgs_fallback(text_svg_code, elements_svg_code, background_image_url)
 
-def simple_combine_svgs_fallback(text_svg_code, traced_svg_code):
-    """Fallback simple combination method with improved error handling"""
+def simple_combine_svgs_fallback(text_svg_code, elements_svg_code, background_image_url=None):
+    """Fallback simple combination method with improved error handling for 3 layers"""
     try:
-        logger.info("Using fallback SVG combination method")
+        logger.info("Using fallback 3-layer SVG combination method")
         
         # Validate inputs
-        if not text_svg_code or not traced_svg_code:
+        if not text_svg_code or not elements_svg_code:
             logger.warning("Missing SVG input data for fallback")
-            return traced_svg_code if traced_svg_code else text_svg_code
+            return elements_svg_code if elements_svg_code else text_svg_code
         
         # Extract content from both SVGs
         text_match = re.search(r'<svg[^>]*>(.*?)</svg>', text_svg_code, re.DOTALL | re.IGNORECASE)
-        traced_match = re.search(r'<svg[^>]*>(.*?)</svg>', traced_svg_code, re.DOTALL | re.IGNORECASE)
+        elements_match = re.search(r'<svg[^>]*>(.*?)</svg>', elements_svg_code, re.DOTALL | re.IGNORECASE)
         
         if not text_match:
             logger.warning("Could not extract text SVG content, using entire text SVG")
@@ -1624,38 +1909,47 @@ def simple_combine_svgs_fallback(text_svg_code, traced_svg_code):
         else:
             text_content = text_match.group(1).strip()
             
-        if not traced_match:
-            logger.warning("Could not extract traced SVG content, using entire traced SVG")
-            traced_content = traced_svg_code
+        if not elements_match:
+            logger.warning("Could not extract elements SVG content, using entire elements SVG")
+            elements_content = elements_svg_code
         else:
-            traced_content = traced_match.group(1).strip()
+            elements_content = elements_match.group(1).strip()
         
-        # Create combined SVG with better structure
+        # Prepare background layer using the provided URL
+        background_layer = ""
+        if background_image_url:
+            background_layer = f'''<image href="{background_image_url}" x="0" y="0" width="1080" height="1080" preserveAspectRatio="xMidYMid slice"/>'''
+        
+        # Create combined SVG with 3-layer structure
         combined_svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" width="1080" height="1080">
   <defs>
     <!-- Include any definitions from original SVGs -->
   </defs>
-  <g id="background-layer" opacity="0.9">
-    {traced_content}
+  <g id="background-layer">
+    {background_layer}
+  </g>
+  <g id="elements-layer" opacity="0.9">
+    {elements_content}
   </g>
   <g id="text-layer">
     {text_content}
   </g>
 </svg>'''
         
-        logger.info("Fallback SVG combination completed successfully")
+        logger.info("Fallback 3-layer SVG combination completed successfully")
         return combined_svg
         
     except Exception as e:
-        logger.error(f"Error in fallback SVG combination: {str(e)}")
+        logger.error(f"Error in fallback 3-layer SVG combination: {str(e)}")
         logger.error(f"Text SVG preview: {text_svg_code[:100] if text_svg_code else 'None'}...")
-        logger.error(f"Traced SVG preview: {traced_svg_code[:100] if traced_svg_code else 'None'}...")
-        # Return the traced SVG as the safest fallback
-        return traced_svg_code if traced_svg_code else text_svg_code
+        logger.error(f"Elements SVG preview: {elements_svg_code[:100] if elements_svg_code else 'None'}...")
+        logger.error(f"Background URL: {background_image_url}")
+        # Return the elements SVG as the safest fallback
+        return elements_svg_code if elements_svg_code else text_svg_code
 
 @app.route('/api/generate-parallel-svg', methods=['POST'])
 def generate_parallel_svg():
-    """Pipeline: Stages 1-6 image gen, then parallel Stage 7: OCR+SVG and Clean SVG generation"""
+    """Enhanced Pipeline: Stages 1-6 image gen, then triple parallel Stage 7: Text SVG, Background Extraction, and Elements SVG generation"""
     try:
         if not PARALLEL_FEATURES_AVAILABLE:
             return jsonify({
@@ -1697,122 +1991,374 @@ def generate_parallel_svg():
         enhanced_prompt = enhance_prompt_with_chat(pre_enhanced_prompt)
         logger.info('Enhanced prompt generated')
 
+        # Create unified session for parallel pipeline BEFORE image generation
+        parallel_session_id = f"parallel_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+        logger.info(f'Created parallel session: {parallel_session_id}')
+        
         # Build advanced image prompt optimized for parallel SVG processing
         image_prompt = build_advanced_image_prompt(enhanced_prompt, design_context)
 
         # Stage 6: Image Generation via GPT-Image using enhanced prompt
         logger.info('Stage 6: Image Generation via GPT-Image with enhanced prompt')
         logger.debug(f'Image prompt: {image_prompt[:200]}...')
-        image_base64, image_filename = generate_image_with_gpt(image_prompt, design_context)
+        image_base64, temp_image_filename, initial_public_url = generate_image_with_gpt(image_prompt, design_context)
         image_data = base64.b64decode(image_base64)
+        
+        # Save the initial generated image to unified storage immediately
+        logger.info(f'Saving initial generated image to unified storage session: {parallel_session_id}')
+        initial_image_filename, initial_image_relative_path, _ = save_image(image_base64, prefix="initial_generated", session_id=parallel_session_id)
 
-        # Stage 7: Parallel Processing
-        logger.info('Stage 7: Parallel Processing - OCR+SVG and Clean SVG')
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            # Submit both tasks
+        # Stage 7: Triple Parallel Processing
+        logger.info('Stage 7: Triple Parallel Processing - Text SVG, Background Extraction, and Elements SVG')
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            # Submit all three tasks
             ocr_future = executor.submit(process_ocr_svg, image_data)
-            clean_future = executor.submit(process_clean_svg, image_data)
+            background_future = executor.submit(process_background_extraction, image_data)
+            elements_future = executor.submit(process_clean_svg, image_data)
             
             # Get results
             text_svg_code, text_svg_path = ocr_future.result()
-            clean_svg_code, clean_svg_path, edited_png_path = clean_future.result()
+            background_base64, background_filename, background_path, background_public_url = background_future.result()
+            elements_svg_code, elements_svg_path, edited_png_path = elements_future.result()
 
-        # Stage 8: AI-Powered SVG Combination
-        logger.info('Stage 8: AI-Powered SVG Combination using GPT-4.1-nano')
-        combined_svg_code = ai_combine_svgs(text_svg_code, clean_svg_code)
+        # Session already created above
+
+        # Base URL for unified storage
+        base_url = '/static/images/sessions'
+
+        # Save all files directly to unified session folder using session_id
+        try:
+            # Initial image already saved above as 'initial_generated'
+            
+            # Save background image to unified storage
+            _, background_relative_path, _ = save_image(background_base64, prefix="background", session_id=parallel_session_id)
+            
+            # Save text SVG to unified storage
+            _, text_svg_relative_path, _ = save_svg(text_svg_code, prefix="text_svg", session_id=parallel_session_id)
+            
+            # Save elements SVG to unified storage
+            _, elements_svg_relative_path, _ = save_svg(elements_svg_code, prefix="elements_svg", session_id=parallel_session_id)
+            
+            # Save elements PNG to unified storage
+            with open(edited_png_path, 'rb') as f:
+                edited_png_data = f.read()
+            edited_png_base64 = base64.b64encode(edited_png_data).decode('utf-8')
+            _, edited_png_relative_path, _ = save_image(edited_png_base64, prefix="elements_png", format="PNG", session_id=parallel_session_id)
+
+        except Exception as e:
+            logger.warning(f"Error saving files to unified storage: {e}")
+            # Fallback to using original paths
+            initial_image_relative_path = temp_image_filename
+            background_relative_path = background_filename
+            text_svg_relative_path = text_svg_path
+            elements_svg_relative_path = elements_svg_path
+            edited_png_relative_path = os.path.basename(edited_png_path)
+
+        # Construct PUBLIC URLs for serving using unified storage paths  
+        initial_image_public_url = get_public_image_url(f"sessions/{parallel_session_id}/{initial_image_filename}")
+        text_svg_public_url = get_public_image_url(f"sessions/{parallel_session_id}/{os.path.basename(text_svg_relative_path)}")
+        # Use the background_public_url we already have from the background extraction
+        elements_svg_public_url = get_public_image_url(f"sessions/{parallel_session_id}/{os.path.basename(elements_svg_relative_path)}")
+        edited_png_public_url = get_public_image_url(f"sessions/{parallel_session_id}/{os.path.basename(edited_png_relative_path)}")
+
+        # Log all public URLs for debugging
+        logger.info(f"Generated public URLs:")
+        logger.info(f"  Initial image: {initial_image_public_url}")
+        logger.info(f"  Background: {background_public_url}")
+        logger.info(f"  Text SVG: {text_svg_public_url}")
+        logger.info(f"  Elements SVG: {elements_svg_public_url}")
+        logger.info(f"  Elements PNG: {edited_png_public_url}")
+
+        # Also create relative URLs for backward compatibility in response
+        initial_image_url = f"{base_url}/{parallel_session_id}/{initial_image_filename}"
+        text_svg_url = f"{base_url}/{parallel_session_id}/{os.path.basename(text_svg_relative_path)}"
+        background_url = f"{base_url}/{parallel_session_id}/{os.path.basename(background_relative_path)}"
+        elements_svg_url = f"{base_url}/{parallel_session_id}/{os.path.basename(elements_svg_relative_path)}"
+        edited_png_url = f"{base_url}/{parallel_session_id}/{os.path.basename(edited_png_relative_path)}"
+
+        # Stage 8: AI-Powered 3-Layer SVG Combination using PUBLIC URLs for proper embedding
+        logger.info('Stage 8: AI-Powered 3-Layer SVG Combination using gpt-4.1-mini with PUBLIC background URL')
+        logger.info(f'Using public background URL for SVG combination: {background_public_url}')
+        combined_svg_code = ai_combine_svgs(text_svg_code, elements_svg_code, background_public_url)
         
         # Validate the combined SVG
         if not combined_svg_code or not combined_svg_code.strip():
-            logger.error("Combined SVG is empty, using fallback")
-            combined_svg_code = simple_combine_svgs_fallback(text_svg_code, clean_svg_code)
+            logger.error("Combined SVG is empty, using fallback with public URL")
+            combined_svg_code = simple_combine_svgs_fallback(text_svg_code, elements_svg_code, background_public_url)
         
         # Ensure the SVG is well-formed
         if not combined_svg_code.strip().startswith('<svg'):
-            logger.warning("Combined SVG doesn't start with <svg, using fallback")
-            combined_svg_code = simple_combine_svgs_fallback(text_svg_code, clean_svg_code)
+            logger.warning("Combined SVG doesn't start with <svg, using fallback with public URL")
+            combined_svg_code = simple_combine_svgs_fallback(text_svg_code, elements_svg_code, background_public_url)
         
-        combined_svg_filename = f"combined_svg_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}.svg"
-        combined_svg_path = os.path.join(IMAGES_DIR, combined_svg_filename)
-        with open(combined_svg_path, 'w', encoding='utf-8') as f:
-            f.write(combined_svg_code)
+        # Stage 9: Post-process SVG with OpenAI to remove first path in elements-layer
+        logger.info('Stage 9: Post-processing SVG to remove first path in elements-layer using gpt-4.1-mini')
+        combined_svg_code = post_process_svg_remove_first_path(combined_svg_code)
+        
+        # Save combined SVG to unified storage
+        combined_svg_filename, combined_svg_relative_path, _ = save_svg(combined_svg_code, prefix="combined_svg", session_id=parallel_session_id)
         
         logger.info(f"Combined SVG saved successfully: {combined_svg_filename}")
 
-        # Create a session subfolder and move outputs there
-        session_folder = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
-        output_folder = os.path.join(PARALLEL_OUTPUTS_DIR, session_folder)
-        os.makedirs(output_folder, exist_ok=True)
-
-        # Base URL for parallel outputs
-        base_url = '/static/images/parallel'
-
-        # Move files to session folder
-        try:
-            # Move generated image
-            src_image = os.path.join(IMAGES_DIR, image_filename)
-            dst_image = os.path.join(output_folder, image_filename)
-            if os.path.exists(src_image):
-                os.rename(src_image, dst_image)
-
-            # Move text SVG
-            src_text_svg = os.path.join(IMAGES_DIR, text_svg_path)
-            dst_text_svg = os.path.join(output_folder, text_svg_path)
-            if os.path.exists(src_text_svg):
-                os.rename(src_text_svg, dst_text_svg)
-
-            # Move cleaned SVG
-            src_clean_svg = os.path.join(IMAGES_DIR, clean_svg_path) if not os.path.isabs(clean_svg_path) else clean_svg_path
-            dst_clean_svg = os.path.join(output_folder, os.path.basename(clean_svg_path))
-            if os.path.exists(src_clean_svg):
-                os.rename(src_clean_svg, dst_clean_svg)
-
-            # Move combined SVG
-            dst_combined_svg = os.path.join(output_folder, combined_svg_filename)
-            if os.path.exists(combined_svg_path):
-                os.rename(combined_svg_path, dst_combined_svg)
-
-            # Move cleaned PNG
-            dst_edited_png = os.path.join(output_folder, os.path.basename(edited_png_path))
-            if os.path.exists(edited_png_path):
-                os.rename(edited_png_path, dst_edited_png)
-
-        except Exception as e:
-            logger.warning(f"Error moving files to session folder: {e}")
-
-        # Construct URLs for client access
-        image_url = f"{base_url}/{session_folder}/{image_filename}"
-        text_svg_url = f"{base_url}/{session_folder}/{text_svg_path}"
-        clean_svg_url = f"{base_url}/{session_folder}/{os.path.basename(clean_svg_path)}"
-        combined_svg_url = f"{base_url}/{session_folder}/{combined_svg_filename}"
-        edited_png_url = f"{base_url}/{session_folder}/{os.path.basename(edited_png_path)}"
+        # Final combined SVG URL
+        combined_svg_url = f"{base_url}/{parallel_session_id}/{combined_svg_filename}"
 
         return jsonify({
             'original_prompt': user_input,
-            'image_url': image_url,
-            'edited_png': {
-                'path': f"parallel/{session_folder}/{os.path.basename(edited_png_path)}",
-                'url': edited_png_url
+            'initial_image': {
+                'url': initial_image_url,
+                'public_url': initial_image_public_url,
+                'path': initial_image_relative_path,
+                'filename': initial_image_filename
+            },
+            'background': {
+                'base64': background_base64,
+                'path': f"sessions/{parallel_session_id}/{os.path.basename(background_relative_path)}",
+                'url': background_url,
+                'public_url': background_public_url
+            },
+            'elements_png': {
+                'path': f"sessions/{parallel_session_id}/{os.path.basename(edited_png_relative_path)}",
+                'url': edited_png_url,
+                'public_url': edited_png_public_url
             },
             'text_svg': {
                 'code': text_svg_code,
-                'path': f"parallel/{session_folder}/{text_svg_path}",
-                'url': text_svg_url
+                'path': f"sessions/{parallel_session_id}/{os.path.basename(text_svg_relative_path)}",
+                'url': text_svg_url,
+                'public_url': text_svg_public_url
             },
-            'clean_svg': {
-                'code': clean_svg_code,
-                'path': f"parallel/{session_folder}/{os.path.basename(clean_svg_path)}",
-                'url': clean_svg_url
+            'elements_svg': {
+                'code': elements_svg_code,
+                'path': f"sessions/{parallel_session_id}/{os.path.basename(elements_svg_relative_path)}",
+                'url': elements_svg_url,
+                'public_url': elements_svg_public_url
             },
             'combined_svg': {
                 'code': combined_svg_code,
-                'path': f"parallel/{session_folder}/{combined_svg_filename}",
-                'url': combined_svg_url
+                'path': combined_svg_relative_path,
+                'url': combined_svg_url,
+                'public_url': get_public_image_url(combined_svg_relative_path)
             },
-            'stage': 8
+            'session_id': parallel_session_id,
+            'stage': 8,
+            'note': 'SVG now uses public URLs for proper image embedding'
         })
 
     except Exception as e:
         logger.error(f"Error in generate_parallel_svg: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+def process_image_with_gpt_image(image_url, session_id):
+    """Process main image through GPT Image-1 to remove text and background"""
+    try:
+        # Create prompt to remove text and background, keeping only elements
+        removal_prompt = """Remove ALL text and background from this image completely. 
+        Keep only the main visual elements/objects/graphics. 
+        Make the background completely transparent or white. 
+        Remove any text, labels, watermarks, or written content entirely. 
+        The result should show only the pure visual elements without any text or background patterns."""
+        
+        logger.info(f"Processing image with GPT Image-1: {image_url}")
+        logger.info(f"Removal prompt: {removal_prompt}")
+        
+        # Make request to GPT Image-1 API
+        headers = {
+            "Authorization": f"Bearer {OPENAI_API_KEY_SVG}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": GPT_IMAGE_MODEL,
+            "prompt": removal_prompt,
+            "image": image_url,
+            "size": "1024x1024",
+            "quality": "standard",
+            "n": 1
+        }
+        
+        response = requests.post(
+            "https://api.openai.com/v1/images/edits",
+            headers=headers,
+            json=payload,
+            timeout=60
+        )
+        
+        if response.status_code != 200:
+            logger.error(f"GPT Image-1 API error: {response.status_code} - {response.text}")
+            return {
+                "success": False,
+                "error": f"GPT Image-1 API error: {response.status_code}"
+            }
+        
+        result = response.json()
+        
+        if not result.get('data') or len(result['data']) == 0:
+            return {
+                "success": False,
+                "error": "No image generated by GPT Image-1"
+            }
+        
+        # Download the generated clean image
+        clean_image_url = result['data'][0]['url']
+        
+        # Save the clean image locally
+        image_response = requests.get(clean_image_url, timeout=30)
+        if image_response.status_code != 200:
+            return {
+                "success": False,
+                "error": "Failed to download clean image"
+            }
+        
+        # Save to session directory
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        image_filename = f"clean_meat_ratio_{timestamp}_{uuid.uuid4().hex[:8]}.png"
+        session_dir = os.path.join(UNIFIED_STORAGE_DIR, session_id)
+        image_path = os.path.join(session_dir, image_filename)
+        
+        with open(image_path, 'wb') as f:
+            f.write(image_response.content)
+        
+        logger.info(f"Clean image saved: {image_path}")
+        
+        return {
+            "success": True,
+            "image_path": image_path,
+            "image_url": clean_image_url
+        }
+        
+    except Exception as e:
+        logger.error(f"Error processing image with GPT Image-1: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+def convert_clean_image_to_svg(image_path, session_id):
+    """Convert clean image to SVG using vtracer"""
+    try:
+        if not PARALLEL_FEATURES_AVAILABLE:
+            return {
+                "success": False,
+                "error": "vtracer not available"
+            }
+        
+        logger.info(f"Converting image to SVG: {image_path}")
+        
+        # Use vtracer to convert PNG to SVG
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        svg_filename = f"meat_ratio_svg_{timestamp}_{uuid.uuid4().hex[:8]}.svg"
+        session_dir = os.path.join(UNIFIED_STORAGE_DIR, session_id)
+        svg_path = os.path.join(session_dir, svg_filename)
+        
+        # vtracer conversion
+        vtracer.convert_image_to_svg_py(
+            input_path=image_path,
+            output_path=svg_path,
+            colormode='color',
+            hierarchical='stacked',
+            mode='spline',
+            filter_speckle=4,
+            color_precision=6,
+            layer_difference=16,
+            corner_threshold=60,
+            length_threshold=4.0,
+            max_iterations=10,
+            splice_threshold=45,
+            path_precision=3
+        )
+        
+        if not os.path.exists(svg_path):
+            return {
+                "success": False,
+                "error": "SVG file was not created"
+            }
+        
+        logger.info(f"SVG generated: {svg_path}")
+        
+        return {
+            "success": True,
+            "svg_path": svg_path
+        }
+        
+    except Exception as e:
+        logger.error(f"Error converting image to SVG: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@app.route('/api/generate-meat-ratio-svg', methods=['POST'])
+def generate_meat_ratio_svg():
+    """Generate SVG from meat ratio by processing main image through GPT Image-1 to remove text/background"""
+    try:
+        data = request.json
+        main_image_url = data.get('main_image_url', '')
+        
+        if not main_image_url:
+            return jsonify({"error": "No main image URL provided"}), 400
+        
+        logger.info("="*80)
+        logger.info(f"Starting meat ratio SVG generation from image: {main_image_url}")
+        logger.info("="*80)
+        
+        # Create session ID for this generation
+        session_id = f"meat_ratio_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+        session_dir = os.path.join(UNIFIED_STORAGE_DIR, session_id)
+        os.makedirs(session_dir, exist_ok=True)
+        
+        logger.info(f"Created session directory: {session_dir}")
+        
+        # Step 1: Process main image through GPT Image-1 to remove text and background
+        logger.info("\n[STEP 1: Processing main image through GPT Image-1]")
+        logger.info("-"*50)
+        
+        clean_image_response = process_image_with_gpt_image(main_image_url, session_id)
+        
+        if not clean_image_response.get('success'):
+            return jsonify({
+                "error": "Failed to process image through GPT Image-1",
+                "details": clean_image_response.get('error', 'Unknown error')
+            }), 500
+        
+        clean_image_path = clean_image_response['image_path']
+        logger.info(f"Clean image generated: {clean_image_path}")
+        
+        # Step 2: Convert clean image to SVG
+        logger.info("\n[STEP 2: Converting clean image to SVG]")
+        logger.info("-"*50)
+        
+        if not PARALLEL_FEATURES_AVAILABLE:
+            logger.warning("vtracer not available, cannot convert to SVG")
+            return jsonify({
+                "warning": "SVG conversion not available",
+                "clean_image_url": f"/static/images/sessions/{session_id}/{os.path.basename(clean_image_path)}"
+            }), 200
+        
+        svg_response = convert_clean_image_to_svg(clean_image_path, session_id)
+        
+        if not svg_response.get('success'):
+            logger.warning(f"SVG conversion failed: {svg_response.get('error')}")
+            return jsonify({
+                "warning": "SVG conversion failed, returning clean image only",
+                "clean_image_url": f"/static/images/sessions/{session_id}/{os.path.basename(clean_image_path)}",
+                "error": svg_response.get('error')
+            }), 200
+        
+        svg_path = svg_response['svg_path']
+        logger.info(f"SVG generated: {svg_path}")
+        
+        # Return successful response
+        return jsonify({
+            "success": True,
+            "session_id": session_id,
+            "clean_image_url": f"/static/images/sessions/{session_id}/{os.path.basename(clean_image_path)}",
+            "svg_url": f"/static/images/sessions/{session_id}/{os.path.basename(svg_path)}",
+            "message": "Meat ratio SVG generated successfully"
+        })
+        
+    except Exception as e:
+        logger.error(f"Meat ratio SVG generation error: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/test-enhancement', methods=['POST'])
