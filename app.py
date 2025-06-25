@@ -1511,19 +1511,19 @@ def process_ocr_svg(image_data):
     img_b64 = base64.b64encode(image_data).decode('utf-8')
     
     # Build prompts matching generate_svg_from_image style
-    system_prompt = """You are an expert SVG code generator. Your task is to create precise, clean, and optimized SVG code that exactly matches the provided image. Follow these guidelines:
+    system_prompt = """You are an expert SVG text generator. Your task is to create precise, clean SVG code that contains ONLY text elements from the provided image. Follow these guidelines:
 1. Create SVG with dimensions 1080x1080 pixels
-2. Ensure perfect positioning and alignment of all elements
+2. Only extract and reproduce text elements - no shapes, paths or other visual elements
 3. Use appropriate viewBox and preserveAspectRatio attributes
-4. Implement proper layering of elements
-5. Optimize paths and shapes for better performance
-6. Use semantic grouping (<g>) for related elements
-7. Include necessary font definitions and styles
-8. Ensure text elements are properly positioned and styled
-9. Implement gradients, patterns, or filters if present in the image
-10. Use precise color values matching the image exactly
+4. Ensure text elements are properly positioned and styled
+5. Include necessary font definitions and text styles
+6. Match text colors exactly from the image
+7. Preserve text alignment and spacing
+8. Use semantic text grouping where appropriate
+9. Optimize text rendering for clarity
+10. Maintain exact text positioning from original image
 
-Focus on producing production-ready, clean SVG code that renders identically to the input image.
+Focus on producing clean SVG code that contains ONLY the text content from the input image.
 Return ONLY the SVG code without any explanations or comments."""
 
     user_content = [
