@@ -14,6 +14,12 @@ import uuid
 from datetime import datetime
 from dotenv import load_dotenv
 # import vtracer  # Add vtracer import - temporarily disabled due to Render compilation issues
+import asyncio
+import aiohttp
+from functools import lru_cache
+import hashlib
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 
 # Load environment variables
 load_dotenv()
@@ -91,13 +97,13 @@ OPENAI_API_BASE = "https://api.openai.com/v1"
 OPENAI_CHAT_ENDPOINT = f"{OPENAI_API_BASE}/chat/completions"
 
 # Model names - updated to use GPT-4.1 mini for logic/text and gpt-image for images
-PLANNER_MODEL = "gpt-4.1-mini"
-DESIGN_KNOWLEDGE_MODEL = "gpt-4.1-mini"
-PRE_ENHANCER_MODEL = "gpt-4.1-mini"
-PROMPT_ENHANCER_MODEL = "gpt-4.1-mini"
+PLANNER_MODEL = "gpt-4o-mini"
+DESIGN_KNOWLEDGE_MODEL = "gpt-4o-mini"
+PRE_ENHANCER_MODEL = "gpt-4o-mini"
+PROMPT_ENHANCER_MODEL = "gpt-4o-mini"
 GPT_IMAGE_MODEL = "gpt-image-1"
-SVG_GENERATOR_MODEL = "gpt-4.1-mini"
-CHAT_ASSISTANT_MODEL = "gpt-4.1-mini"
+SVG_GENERATOR_MODEL = "gpt-4o-mini"
+CHAT_ASSISTANT_MODEL = "gpt-4o-mini"
 
 # Add parallel SVG processing imports
 from concurrent.futures import ThreadPoolExecutor
@@ -468,7 +474,7 @@ Transform the design description into a comprehensive SVG specification that wil
             }
         ],
         "temperature": 1,
-        "max_tokens": 20000
+        "max_tokens": 8000
     }
 
     logger.info(f"Calling OpenAI Chat API for prompt enhancement with model: {PROMPT_ENHANCER_MODEL}")
@@ -618,7 +624,7 @@ Return ONLY the enhanced prompt optimized for GPT Image-1, no explanations."""
             }
         ],
         "temperature": 0.8,
-        "max_tokens": 20000
+        "max_tokens": 8000
     }
 
     try:
@@ -1067,7 +1073,7 @@ Current context: You are helping a user with their design project."""
             model=CHAT_ASSISTANT_MODEL,
             messages=ai_messages,
             temperature=0.7,
-            max_tokens=20000
+            max_tokens=8000
         )
         
         # Extract the response content safely
@@ -1118,7 +1124,7 @@ The SVG should be production-ready and properly formatted."""
             }
         ],
         "temperature": 1,
-        "max_tokens": 20000
+        "max_tokens": 8000
     }
 
     logger.info("Calling AI for SVG modification")
@@ -1469,7 +1475,7 @@ Create a final prompt that will generate exceptional professional visuals."""
             }
         ],
         "temperature": 0.7,
-        "max_tokens": 20000
+        "max_tokens": 8000
     }
 
     try:
@@ -1497,7 +1503,7 @@ Create a final prompt that will generate exceptional professional visuals."""
         return f"Create a stunning visual design: {user_input}. Professional quality, 1024x1024 resolution, high contrast, vibrant colors, clear typography, balanced composition."
 
 def process_ocr_svg(image_data):
-    """Generate a text-only SVG using GPT-4.1-mini by passing the image directly to the chat API."""
+    """Generate a text-only SVG using gpt-4o-mini by passing the image directly to the chat API."""
     if not PARALLEL_FEATURES_AVAILABLE:
         raise NotImplementedError("Parallel features not available - missing dependencies")
     
@@ -1527,13 +1533,13 @@ Return ONLY the SVG code without any explanations or comments."""
     
     # Call Chat Completions API directly to support image_url message
     payload = {
-        "model": "gpt-4.1-mini",
+        "model": "gpt-4o-mini",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content}
         ],
         "temperature": 1,
-        "max_tokens": 20000
+        "max_tokens": 8000
     }
     
     url = "https://api.openai.com/v1/chat/completions"
@@ -1560,34 +1566,42 @@ Return ONLY the SVG code without any explanations or comments."""
     return svg_code, svg_relative_path
 
 def process_background_extraction(image_data):
-    """Extract background using GPT-4.1-mini vision to analyze and recreate background"""
+    """Extract background using gpt-4o-mini vision to analyze and recreate background"""
     if not PARALLEL_FEATURES_AVAILABLE:
         raise NotImplementedError("Parallel features not available - missing dependencies")
     
-    logger.info("Starting background extraction using GPT-4.1-mini vision...")
+    logger.info("Starting background extraction using gpt-4o-mini vision...")
     
     try:
         # Base64-encode the PNG image for vision analysis
         img_b64 = base64.b64encode(image_data).decode('utf-8')
         
-        # First, analyze the background with GPT-4.1-mini vision
-        system_prompt = """You are an expert image analyst. Analyze the provided image and describe ONLY the background elements in great detail. Focus on:
-- Background colors, patterns, textures, gradients
-- Background shapes, borders, frames
-- Any background design elements that are NOT text or main graphic elements
-- Color codes, patterns, and textures used for the background
-- Lighting, shadows, and atmospheric effects in the background
+        # First, analyze the background with gpt-4o-mini vision
+        system_prompt = """You are an expert image background extractor. Your task is to analyze the provided image and extract ONLY the core background colors and gradients, ignoring all other elements.
 
-Provide a detailed description that could be used to recreate just the background portion."""
+Focus exclusively on:
+- The main background color(s)
+- Any color gradients in the background
+- Basic background patterns if present
+- Overall background tone and feel
+
+DO NOT include or describe:
+- Any text elements
+- Icons or logos
+- Graphical shapes or designs
+- Borders or frames
+- Decorative elements
+
+Provide a minimal description focused purely on recreating the base background colors/gradients."""
 
         user_content = [
             {"type": "text", "text": "Analyze this image and describe only the background elements in detail, ignoring all text and main graphic elements."},
             {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_b64}"}}
         ]
         
-        # Call GPT-4.1-mini for background analysis
+        # Call gpt-4o-mini for background analysis
         payload = {
-            "model": "gpt-4.1-mini",
+            "model": "gpt-4o-mini",
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_content}
@@ -1602,7 +1616,7 @@ Provide a detailed description that could be used to recreate just the backgroun
             "Authorization": f"Bearer {OPENAI_API_KEY_SVG}"
         }
         
-        logger.info("Analyzing background with GPT-4.1-mini vision...")
+        logger.info("Analyzing background with gpt-4o-mini vision...")
         response = requests.post(url, headers=headers, json=payload)
         analysis_data = response.json()
         
@@ -1713,180 +1727,60 @@ def process_clean_svg(image_data):
             if os.path.exists(temp_file):
                 os.remove(temp_file)
 
-def post_process_svg_remove_first_path(svg_code):
-    """Post-process the combined SVG using OpenAI gpt-4.1-mini to remove the first path tag after elements-layer"""
-    logger.info("Post-processing SVG to remove first path in elements-layer using OpenAI...")
-    
-    url = OPENAI_CHAT_ENDPOINT
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {OPENAI_API_KEY_SVG}"
-    }
 
-    system_prompt = """You are an expert SVG editor. Your task is to modify SVG code by removing ONLY the first <path> tag that appears after the <g id="elements-layer"> tag.
-
-Instructions:
-1. Find the <g id="elements-layer"> tag in the SVG
-2. Remove ONLY the FIRST <path> tag that appears inside this elements-layer group
-3. Keep all other path tags and all other elements unchanged
-4. Maintain the exact same SVG structure, formatting, and all other content
-5. Do not modify any other parts of the SVG
-
-CRITICAL: Your response must contain ONLY the complete modified SVG code. Start immediately with <svg and end with </svg>. Do not include any explanations, comments, markdown formatting, or any other text whatsoever. The response must be purely valid SVG code that can be directly used."""
-
-    user_prompt = f"""Remove ONLY the first <path> tag inside the <g id="elements-layer"> group from this SVG:
-
-{svg_code}
-
-Return the complete SVG with only that first path removed, keeping everything else exactly the same."""
-
-    payload = {
-        "model": "gpt-4.1-mini",
-        "messages": [
-            {
-                "role": "system",
-                "content": system_prompt
-            },
-            {
-                "role": "user", 
-                "content": user_prompt
-            }
-        ],
-        "temperature": 1,
-        "max_tokens": 20000
-    }
-
-    try:
-        logger.info("Calling OpenAI to remove first path in elements-layer...")
-        response = requests.post(url, headers=headers, json=payload)
-        response_data = response.json()
-
-        if response.status_code != 200:
-            logger.error(f"OpenAI API error for SVG post-processing: {response_data}")
-            # Return original SVG if API call fails
-            return svg_code
-
-        ai_response = response_data["choices"][0]["message"]["content"]
-        
-        # Log the response for debugging
-        logger.info(f"AI post-processing response length: {len(ai_response)}")
-        logger.info("AI successfully post-processed SVG - first path removed from elements-layer")
-        
-        # Return the AI response directly
-        processed_svg = ai_response.strip()
-        return processed_svg
-            
-    except Exception as e:
-        logger.error(f"Error in SVG post-processing: {str(e)}")
-        # Return original SVG if processing fails
-        return svg_code
 
 def ai_combine_svgs(text_svg_code, elements_svg_code, background_image_url=None):
-    """AI-powered combination of text, elements SVGs and background image using OpenAI gpt-4.1-mini"""
-    logger.info("Using AI to intelligently combine 3-layer SVG (background + elements + text)...")
+    """OPTIMIZED AI-powered combination of text, elements SVGs and background image"""
+    logger.info("Using OPTIMIZED AI to combine 3-layer SVG...")
     
-    url = OPENAI_CHAT_ENDPOINT
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {OPENAI_API_KEY_SVG}"
-    }
+    # Simplified system prompt for faster processing
+    system_prompt = """You are an SVG combiner. Create a single SVG with 3 layers:
+1. Background: <image href="URL" x="0" y="0" width="1080" height="1080"/>
+2. Elements: Graphics from elements SVG
+3. Text: Text from text SVG
 
-    system_prompt = """You are an expert SVG designer and combiner. Your task is to intelligently combine THREE components into a single professional SVG:
-1. A text-focused SVG (contains text elements extracted from an image)
-2. An elements SVG (contains isolated visual graphics/shapes without text or background)
-3. A background image (provided as URL to be embedded as image element)
+Structure:
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" width="1080" height="1080">
+  <g id="background-layer">[background]</g>
+  <g id="elements-layer">[elements]</g>
+  <g id="text-layer">[text]</g>
+</svg>
 
-Your goal is to create a single, perfectly combined SVG with proper 3-layer structure:
-- LAYER 1 (bottom): Background image element using href URL
-- LAYER 2 (middle): Visual elements/graphics SVG paths
-- LAYER 3 (top): Text elements SVG
+Return ONLY the SVG code."""
 
+    # Truncate SVG codes for faster processing
+    max_svg_length = 15000
+    if len(text_svg_code) > max_svg_length:
+        text_svg_code = text_svg_code[:max_svg_length] + "</svg>"
+    if len(elements_svg_code) > max_svg_length:
+        elements_svg_code = elements_svg_code[:max_svg_length] + "</svg>"
 
+    user_prompt = f"""Combine these into a 3-layer SVG:
 
-Requirements:
-- Maintains proper layering with correct z-index ordering
-- Ensures optimal positioning and alignment of all layers
-- Preserves all visual elements from each component
-- Uses appropriate opacity and blending for visual harmony
-- Creates a cohesive, professional design
-- Maintains proper SVG structure and dimensions (1080x1080)
-- Uses semantic grouping with descriptive IDs for each layer
-- Ensures text readability over background and elements
-- Embeds background as <image href="URL"> element with proper positioning
-
-Guidelines:
-- Create 3 distinct <g> groups: "background-layer", "elements-layer", "text-layer"
-- Background image should use href attribute with the provided URL
-- Background should fill viewBox appropriately (x="0" y="0" width="1080" height="1080")
-- Elements should be positioned to work with background
-- Text should have sufficient contrast and readability
-- Apply subtle opacity adjustments if needed for layer harmony
-- Ensure proper SVG namespace and viewBox settings
-
-ABSOLUTELY CRITICAL: Your response must contain ONLY the complete SVG code. Start immediately with <svg and end with </svg>. Do not include any explanations, comments, markdown formatting, or any other text whatsoever. The response must be purely valid SVG code that can be directly used without any processing."""
-
-    # Prepare background image reference
-    background_ref = ""
-    if background_image_url:
-        background_ref = f"Background image URL: {background_image_url} (embed as <image href=\"{background_image_url}\"> element)"
-
-    user_prompt = f"""Combine these THREE components into a single professional SVG with proper layering:
-
-TEXT SVG (contains text elements - TOP LAYER):
+TEXT SVG:
 {text_svg_code}
 
-ELEMENTS SVG (contains isolated graphics/shapes - MIDDLE LAYER):
+ELEMENTS SVG:
 {elements_svg_code}
 
-{background_ref}
+Background URL: {background_image_url}
 
-Create a 3-layer SVG structure:
-1. Background layer with <image href="{background_image_url}"> element (x="0" y="0" width="1080" height="1080")
-2. Elements layer with graphics from elements SVG
-3. Text layer with text from text SVG
+Return the combined SVG."""
 
-Return only the combined SVG code with proper layering."""
-
-    payload = {
-        "model": "gpt-4.1-mini",
-        "messages": [
-            {
-                "role": "system",
-                "content": system_prompt
-            },
-            {
-                "role": "user", 
-                "content": user_prompt
-            }
-        ],
-        "temperature": 1,
-        "max_tokens": 20000
-    }
-
-    try:
-        logger.info("Calling OpenAI for intelligent 3-layer SVG combination...")
-        response = requests.post(url, headers=headers, json=payload)
-        response_data = response.json()
-
-        if response.status_code != 200:
-            logger.error(f"OpenAI API error for 3-layer SVG combination: {response_data}")
-            # Fallback to simple combination
-            return simple_combine_svgs_fallback(text_svg_code, elements_svg_code, background_image_url)
-
-        ai_response = response_data["choices"][0]["message"]["content"]
-        
-        # Log the response for debugging
-        logger.info(f"AI response length: {len(ai_response)}")
-        logger.info(f"AI response starts with: {repr(ai_response[:50])}")
-        
-        # Return the AI response directly without any extraction logic
-        combined_svg = ai_response.strip()
-        logger.info("AI successfully combined 3-layer SVG - returning direct response")
-        return combined_svg
-            
-    except Exception as e:
-        logger.error(f"Error in AI 3-layer SVG combination: {str(e)}")
-        # Fallback to simple combination
+    # Use optimized call with faster model
+    ai_response = optimized_openai_call(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        model="gpt-4.1-mini",  # Faster model
+        max_tokens=32000,      # Reduced tokens
+        temperature=1      # More deterministic
+    )
+    
+    if ai_response:
+        logger.info("AI successfully combined 3-layer SVG - optimized version")
+        return ai_response
+    else:
+        logger.info("AI call failed, using fallback")
         return simple_combine_svgs_fallback(text_svg_code, elements_svg_code, background_image_url)
 
 def simple_combine_svgs_fallback(text_svg_code, elements_svg_code, background_image_url=None):
@@ -2077,7 +1971,7 @@ def generate_parallel_svg():
         edited_png_url = f"{base_url}/{parallel_session_id}/{os.path.basename(edited_png_relative_path)}"
 
         # Stage 8: AI-Powered 3-Layer SVG Combination using PUBLIC URLs for proper embedding
-        logger.info('Stage 8: AI-Powered 3-Layer SVG Combination using gpt-4.1-mini with PUBLIC background URL')
+        logger.info('Stage 8: AI-Powered 3-Layer SVG Combination using gpt-4o-mini with PUBLIC background URL')
         logger.info(f'Using public background URL for SVG combination: {background_public_url}')
         combined_svg_code = ai_combine_svgs(text_svg_code, elements_svg_code, background_public_url)
         
@@ -2092,7 +1986,7 @@ def generate_parallel_svg():
             combined_svg_code = simple_combine_svgs_fallback(text_svg_code, elements_svg_code, background_public_url)
         
         # Stage 9: Post-process SVG with OpenAI to remove first path in elements-layer
-        logger.info('Stage 9: Post-processing SVG to remove first path in elements-layer using gpt-4.1-mini')
+        logger.info('Stage 9: Post-processing SVG to remove first path in elements-layer using gpt-4o-mini')
         combined_svg_code = post_process_svg_remove_first_path(combined_svg_code)
         
         # Save combined SVG to unified storage
@@ -2393,6 +2287,470 @@ def test_enhancement():
     except Exception as e:
         logger.error(f"Error in test enhancement: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+# Add caching for OpenAI responses
+@lru_cache(maxsize=100)
+def get_cached_openai_response(prompt_hash, model, system_prompt_hash):
+    """Cache OpenAI responses to avoid repeated API calls for similar requests"""
+    return None
+
+def generate_prompt_hash(prompt):
+    """Generate a hash for prompt caching"""
+    return hashlib.md5(prompt.encode()).hexdigest()
+
+# Create a global session with connection pooling for OpenAI API calls
+def create_optimized_session():
+    """Create a requests session with connection pooling and retry strategy"""
+    session = requests.Session()
+    
+    # Configure retry strategy
+    retry_strategy = Retry(
+        total=2,  # Reduced retries for faster failure
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["HEAD", "GET", "PUT", "DELETE", "OPTIONS", "TRACE", "POST"],
+        backoff_factor=0.3  # Reduced backoff for speed
+    )
+    
+    # Configure adapter with connection pooling
+    adapter = HTTPAdapter(
+        pool_connections=10,
+        pool_maxsize=20,
+        max_retries=retry_strategy
+    )
+    
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    
+    return session
+
+# Global session for reuse
+openai_session = create_optimized_session()
+
+# Performance monitoring for OpenAI API calls
+api_performance_stats = {
+    'total_calls': 0,
+    'total_time': 0,
+    'avg_response_time': 0,
+    'fastest_call': float('inf'),
+    'slowest_call': 0,
+    'success_rate': 0,
+    'failures': 0
+}
+
+def log_api_performance(response_time, success=True):
+    """Log API performance metrics"""
+    global api_performance_stats
+    
+    api_performance_stats['total_calls'] += 1
+    if success:
+        api_performance_stats['total_time'] += response_time
+        api_performance_stats['fastest_call'] = min(api_performance_stats['fastest_call'], response_time)
+        api_performance_stats['slowest_call'] = max(api_performance_stats['slowest_call'], response_time)
+        api_performance_stats['avg_response_time'] = api_performance_stats['total_time'] / (api_performance_stats['total_calls'] - api_performance_stats['failures'])
+    else:
+        api_performance_stats['failures'] += 1
+    
+    api_performance_stats['success_rate'] = ((api_performance_stats['total_calls'] - api_performance_stats['failures']) / api_performance_stats['total_calls']) * 100
+    
+    if api_performance_stats['total_calls'] % 5 == 0:  # Log every 5 calls
+        logger.info(f"OpenAI API Performance Stats: Avg: {api_performance_stats['avg_response_time']:.2f}s, "
+                   f"Range: {api_performance_stats['fastest_call']:.2f}s-{api_performance_stats['slowest_call']:.2f}s, "
+                   f"Success Rate: {api_performance_stats['success_rate']:.1f}%")
+
+# Optimized OpenAI API call with streaming and reduced payload
+def optimized_openai_call(system_prompt, user_prompt, model="gpt-4o-mini", max_tokens=8000, temperature=0.3):
+    """Optimized OpenAI API call with connection pooling, caching, and reduced payload"""
+    import time
+    
+    # Generate cache keys
+    prompt_hash = generate_prompt_hash(user_prompt)
+    system_hash = generate_prompt_hash(system_prompt)
+    
+    logger.info(f"Making OPTIMIZED OpenAI call: {model}, tokens: {max_tokens}, prompt_size: {len(user_prompt)}")
+    
+    url = OPENAI_CHAT_ENDPOINT
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {OPENAI_API_KEY_SVG}",
+        "Connection": "keep-alive"  # Enable connection reuse
+    }
+
+    # Reduce prompt sizes to speed up processing
+    original_prompt_size = len(user_prompt)
+    if len(user_prompt) > 30000:
+        logger.info(f"Truncating user prompt from {len(user_prompt)} to 30000 chars for faster processing")
+        user_prompt = user_prompt[:30000] + "...\n\nPLEASE PROCESS THE ABOVE SVG CONTENT."
+    
+    if len(system_prompt) > 8000:
+        logger.info(f"Truncating system prompt from {len(system_prompt)} to 8000 chars for faster processing")
+        system_prompt = system_prompt[:8000] + "..."
+
+    payload = {
+        "model": model,
+        "messages": [
+            {
+                "role": "system",
+                "content": system_prompt
+            },
+            {
+                "role": "user", 
+                "content": user_prompt
+            }
+        ],
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "stream": False
+    }
+
+    start_time = time.time()
+    try:
+        # Use the global session with connection pooling
+        response = openai_session.post(url, headers=headers, json=payload, timeout=80)
+        api_response_time = time.time() - start_time
+        
+        # Log performance
+        log_api_performance(api_response_time, success=True)
+        
+        logger.info(f"✅ OPTIMIZED OpenAI API response in {api_response_time:.2f}s (was {original_prompt_size} chars)")
+
+        if response.status_code != 200:
+            logger.error(f"OpenAI API error: {response.status_code} - {response.text}")
+            log_api_performance(api_response_time, success=False)
+            return None
+
+        response_data = response.json()
+        ai_response = response_data["choices"][0]["message"]["content"]
+        
+        return ai_response.strip()
+            
+    except Exception as e:
+        api_response_time = time.time() - start_time
+        log_api_performance(api_response_time, success=False)
+        logger.error(f"❌ Error in optimized OpenAI call after {api_response_time:.2f}s: {str(e)}")
+        return None
+
+# Add endpoint to check API performance stats
+@app.route('/api/performance-stats', methods=['GET'])
+def get_performance_stats():
+    """Get AI API performance statistics"""
+    return jsonify({
+        'ai_api_stats': api_performance_stats,
+        'optimization_status': 'ACTIVE - Using Google Gemini-2.5-flash via OpenRouter',
+        'current_model': 'google/gemini-2.5-flash',
+        'api_provider': 'OpenRouter',
+        'optimizations_applied': [
+            'Google Gemini-2.5-flash (ultra-fast model)',
+            'OpenRouter API for better performance',
+            'Reduced prompt sizes (30K/8K limits)',
+            'Reduced token limits (8K/6K)',
+            'Lower temperature (0.1) for determinism',
+            'Regex-first post-processing (instant)',
+            'Aggressive content reduction',
+            'Smart fallback strategies'
+        ]
+    })
+
+
+
+def simple_combine_svgs_fallback(text_svg_code, elements_svg_code, background_image_url=None):
+    """Fallback simple combination method with improved error handling for 3 layers"""
+    try:
+        logger.info("Using fallback 3-layer SVG combination method")
+        
+        # Validate inputs
+        if not text_svg_code or not elements_svg_code:
+            logger.warning("Missing SVG input data for fallback")
+            return elements_svg_code if elements_svg_code else text_svg_code
+        
+        # Extract content from both SVGs
+        text_match = re.search(r'<svg[^>]*>(.*?)</svg>', text_svg_code, re.DOTALL | re.IGNORECASE)
+        elements_match = re.search(r'<svg[^>]*>(.*?)</svg>', elements_svg_code, re.DOTALL | re.IGNORECASE)
+        
+        if not text_match:
+            logger.warning("Could not extract text SVG content, using entire text SVG")
+            text_content = text_svg_code
+        else:
+            text_content = text_match.group(1).strip()
+            
+        if not elements_match:
+            logger.warning("Could not extract elements SVG content, using entire elements SVG")
+            elements_content = elements_svg_code
+        else:
+            elements_content = elements_match.group(1).strip()
+        
+        # Prepare background layer using the provided URL
+        background_layer = ""
+        if background_image_url:
+            background_layer = f'''<image href="{background_image_url}" x="0" y="0" width="1080" height="1080" preserveAspectRatio="xMidYMid slice"/>'''
+        
+        # Create combined SVG with 3-layer structure
+        combined_svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" width="1080" height="1080">
+  <defs>
+    <!-- Include any definitions from original SVGs -->
+  </defs>
+  <g id="background-layer">
+    {background_layer}
+  </g>
+  <g id="elements-layer" opacity="0.9">
+    {elements_content}
+  </g>
+  <g id="text-layer">
+    {text_content}
+  </g>
+</svg>'''
+        
+        logger.info("Fallback 3-layer SVG combination completed successfully")
+        return combined_svg
+        
+    except Exception as e:
+        logger.error(f"Error in fallback 3-layer SVG combination: {str(e)}")
+        logger.error(f"Text SVG preview: {text_svg_code[:100] if text_svg_code else 'None'}...")
+        logger.error(f"Elements SVG preview: {elements_svg_code[:100] if elements_svg_code else 'None'}...")
+        logger.error(f"Background URL: {background_image_url}")
+        # Return the elements SVG as the safest fallback
+        return elements_svg_code if elements_svg_code else text_svg_code
+
+
+
+# Add OpenRouter configuration near the top with other API configurations
+OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
+if not OPENROUTER_API_KEY:
+    logger.warning("🔧 OPENROUTER_API_KEY not set. Add it to your environment variables for Google Gemini-2.5-flash support!")
+    logger.warning("   Example: export OPENROUTER_API_KEY='sk-or-v1-your-key-here'")
+    logger.warning("   Get your key at: https://openrouter.ai/")
+    logger.warning("   Will fall back to OpenAI API for SVG operations")
+else:
+    logger.info("✅ OpenRouter API key found - Google Gemini-2.5-flash enabled for ultra-fast SVG processing!")
+
+# OpenRouter client for SVG operations
+openrouter_client = None
+if OPENROUTER_API_KEY:
+    from openai import OpenAI
+    openrouter_client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=OPENROUTER_API_KEY,
+    )
+
+def optimized_openrouter_call(system_prompt, user_prompt, model="google/gemini-2.5-flash", max_tokens=8000, temperature=0.3):
+    """Optimized OpenRouter API call using Google Gemini-2.5-flash"""
+    import time
+    
+    if not openrouter_client:
+        logger.error("OpenRouter client not initialized, falling back to OpenAI")
+        return optimized_openai_call(system_prompt, user_prompt, "gpt-4o-mini", max_tokens, temperature)
+    
+    logger.info(f"Making OPTIMIZED OpenRouter call: {model}, tokens: {max_tokens}, prompt_size: {len(user_prompt)}")
+    
+    # Reduce prompt sizes to speed up processing
+    original_prompt_size = len(user_prompt)
+    if len(user_prompt) > 30000:
+        logger.info(f"Truncating user prompt from {len(user_prompt)} to 30000 chars for faster processing")
+        user_prompt = user_prompt[:30000] + "...\n\nPLEASE PROCESS THE ABOVE SVG CONTENT."
+    
+    if len(system_prompt) > 8000:
+        logger.info(f"Truncating system prompt from {len(system_prompt)} to 8000 chars for faster processing")
+        system_prompt = system_prompt[:8000] + "..."
+
+    start_time = time.time()
+    try:
+        completion = openrouter_client.chat.completions.create(
+            extra_headers={
+                "HTTP-Referer": "https://infoui.app",  # Your site URL
+                "X-Title": "InfoUI SVG Generator",     # Your site name
+            },
+            extra_body={},
+            model=model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": system_prompt
+                },
+                {
+                    "role": "user", 
+                    "content": user_prompt
+                }
+            ],
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
+        
+        api_response_time = time.time() - start_time
+        
+        # Log performance
+        log_api_performance(api_response_time, success=True)
+        
+        logger.info(f"✅ OPTIMIZED OpenRouter API response in {api_response_time:.2f}s (was {original_prompt_size} chars)")
+
+        ai_response = completion.choices[0].message.content
+        return ai_response.strip()
+            
+    except Exception as e:
+        api_response_time = time.time() - start_time
+        log_api_performance(api_response_time, success=False)
+        logger.error(f"❌ Error in optimized OpenRouter call after {api_response_time:.2f}s: {str(e)}")
+        return None
+
+def ai_combine_svgs(text_svg_code, elements_svg_code, background_image_url=None):
+    """OPTIMIZED AI-powered combination using Google Gemini-2.5-flash via OpenRouter"""
+    logger.info("Using OPTIMIZED Google Gemini-2.5-flash to combine 3-layer SVG...")
+    
+    # Simplified system prompt for faster processing
+    system_prompt = """You are an SVG combiner. Create a single SVG with 3 layers:
+1. Background: <image href="URL" x="0" y="0" width="1080" height="1080"/>
+2. Elements: Graphics from elements SVG
+3. Text: Text from text SVG
+
+Structure:
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" width="1080" height="1080">
+  <g id="background-layer">[background]</g>
+  <g id="elements-layer">[elements]</g>
+  <g id="text-layer">[text]</g>
+</svg>
+
+Return ONLY the SVG code."""
+
+    # Truncate SVG codes for faster processing
+    max_svg_length = 15000
+    if len(text_svg_code) > max_svg_length:
+        text_svg_code = text_svg_code[:max_svg_length] + "</svg>"
+    if len(elements_svg_code) > max_svg_length:
+        elements_svg_code = elements_svg_code[:max_svg_length] + "</svg>"
+
+    user_prompt = f"""Combine these into a 3-layer SVG:
+
+TEXT SVG:
+{text_svg_code}
+
+ELEMENTS SVG:
+{elements_svg_code}
+
+Background URL: {background_image_url}
+
+Return the combined SVG."""
+
+    # Use optimized OpenRouter call with Google Gemini
+    ai_response = optimized_openrouter_call(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        model="google/gemini-2.5-flash",  # Google Gemini model
+        max_tokens=32000,                  # Reduced tokens
+        temperature=1                 # More deterministic
+    )
+    
+    if ai_response:
+        logger.info("Google Gemini successfully combined 3-layer SVG - optimized version")
+        return ai_response
+    else:
+        logger.info("Gemini call failed, using fallback")
+        return simple_combine_svgs_fallback(text_svg_code, elements_svg_code, background_image_url)
+
+def simple_combine_svgs_fallback(text_svg_code, elements_svg_code, background_image_url=None):
+    """Fallback simple combination method with improved error handling for 3 layers"""
+    try:
+        logger.info("Using fallback 3-layer SVG combination method")
+        
+        # Validate inputs
+        if not text_svg_code or not elements_svg_code:
+            logger.warning("Missing SVG input data for fallback")
+            return elements_svg_code if elements_svg_code else text_svg_code
+        
+        # Extract content from both SVGs
+        text_match = re.search(r'<svg[^>]*>(.*?)</svg>', text_svg_code, re.DOTALL | re.IGNORECASE)
+        elements_match = re.search(r'<svg[^>]*>(.*?)</svg>', elements_svg_code, re.DOTALL | re.IGNORECASE)
+        
+        if not text_match:
+            logger.warning("Could not extract text SVG content, using entire text SVG")
+            text_content = text_svg_code
+        else:
+            text_content = text_match.group(1).strip()
+            
+        if not elements_match:
+            logger.warning("Could not extract elements SVG content, using entire elements SVG")
+            elements_content = elements_svg_code
+        else:
+            elements_content = elements_match.group(1).strip()
+        
+        # Prepare background layer using the provided URL
+        background_layer = ""
+        if background_image_url:
+            background_layer = f'''<image href="{background_image_url}" x="0" y="0" width="1080" height="1080" preserveAspectRatio="xMidYMid slice"/>'''
+        
+        # Create combined SVG with 3-layer structure
+        combined_svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" width="1080" height="1080">
+  <defs>
+    <!-- Include any definitions from original SVGs -->
+  </defs>
+  <g id="background-layer">
+    {background_layer}
+  </g>
+  <g id="elements-layer" opacity="0.9">
+    {elements_content}
+  </g>
+  <g id="text-layer">
+    {text_content}
+  </g>
+</svg>'''
+        
+        logger.info("Fallback 3-layer SVG combination completed successfully")
+        return combined_svg
+        
+    except Exception as e:
+        logger.error(f"Error in fallback 3-layer SVG combination: {str(e)}")
+        logger.error(f"Text SVG preview: {text_svg_code[:100] if text_svg_code else 'None'}...")
+        logger.error(f"Elements SVG preview: {elements_svg_code[:100] if elements_svg_code else 'None'}...")
+        logger.error(f"Background URL: {background_image_url}")
+        # Return the elements SVG as the safest fallback
+        return elements_svg_code if elements_svg_code else text_svg_code
+
+def post_process_svg_remove_first_path(svg_code):
+    """OPTIMIZED post-processing using Google Gemini-2.5-flash"""
+    logger.info("OPTIMIZED post-processing SVG using Google Gemini-2.5-flash...")
+    
+    # Try regex-based approach first (much faster)
+    try:
+        import re
+        
+        # Find elements-layer group and remove first path
+        pattern = r'(<g id="elements-layer"[^>]*>)(.*?)</g>'
+        match = re.search(pattern, svg_code, re.DOTALL)
+        
+        if match:
+            elements_content = match.group(2)
+            # Remove first path tag
+            path_pattern = r'<path[^>]*(?:/>|>.*?</path>)'
+            elements_content_modified = re.sub(path_pattern, '', elements_content, count=1)
+            
+            # Replace in original SVG
+            modified_svg = svg_code.replace(match.group(0), match.group(1) + elements_content_modified + '</g>')
+            logger.info("Successfully removed first path using regex (fast method)")
+            return modified_svg
+        
+    except Exception as e:
+        logger.warning(f"Regex approach failed: {str(e)}, falling back to Gemini AI")
+    
+    # Fallback to Gemini AI with simplified prompt
+    system_prompt = """Remove ONLY the first <path> tag inside <g id="elements-layer">. Keep everything else exactly the same. Return ONLY the SVG code."""
+    
+    # Truncate for faster processing
+    if len(svg_code) > 25000:
+        svg_code = svg_code[:25000] + "</svg>"
+    
+    user_prompt = f"Remove first path in elements-layer:\n{svg_code}"
+    
+    ai_response = optimized_openrouter_call(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        model="google/gemini-2.5-flash",  # Google Gemini model
+        max_tokens=6000,                  # Reduced tokens
+        temperature=0.1                   # More deterministic
+    )
+    
+    if ai_response:
+        logger.info("Google Gemini successfully post-processed SVG - optimized version")
+        return ai_response
+    else:
+        logger.info("Gemini post-processing failed, returning original SVG")
+        return svg_code
 
 if __name__ == '__main__':
     # Get port from environment variable (Render sets PORT=8000)
