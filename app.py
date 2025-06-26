@@ -313,7 +313,7 @@ Focus on providing concrete, implementable advice that will directly improve des
             }
         ],
         "temperature": 0.8,
-        "max_tokens": 18000
+        "max_tokens": 15000
     }
 
     response = requests.post(url, headers=headers, json=payload)
