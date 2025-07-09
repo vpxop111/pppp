@@ -13,13 +13,30 @@ import openai
 import uuid
 from datetime import datetime
 from dotenv import load_dotenv
-# import vtracer  # Add vtracer import - temporarily disabled due to Render compilation issues
+import vtracer  # VTracer for image-to-SVG conversion
+# Conditional import of modules that may have additional dependencies
+try:
+    import remove_text_simple  # Text removal for image preprocessing
+    REMOVE_TEXT_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"remove_text_simple not available: {e}")
+    REMOVE_TEXT_AVAILABLE = False
+
+try:
+    import png_to_svg_converter  # PNG to SVG converter utilities
+    PNG_CONVERTER_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"png_to_svg_converter not available: {e}")
+    PNG_CONVERTER_AVAILABLE = False
 import asyncio
 import aiohttp
 from functools import lru_cache
 import hashlib
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
+import cv2
+from PIL import Image, ImageOps
+import numpy as np
 
 # Load environment variables
 load_dotenv()
@@ -31,6 +48,7 @@ CORS(app,
      origins=[
          'http://localhost:3000', 
          'http://localhost:3001',
+        'http://localhost:3002',
          'http://127.0.0.1:3000', 
          'http://127.0.0.1:3001',
          'https://pppp-351z.onrender.com',
@@ -51,6 +69,30 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+# Custom logging filter to suppress 404 errors for missing image files
+class ImageNotFoundFilter(logging.Filter):
+    def filter(self, record):
+        # Suppress 404 logs for missing image files
+        try:
+            log_message = str(record.getMessage()) if hasattr(record, 'getMessage') else str(record.msg)
+            
+            # Check if this is a 404 request for image files
+            if ('404' in log_message and 
+                ('/static/images/' in log_message or 
+                 'background_' in log_message or 
+                 '.png HTTP/1.1' in log_message or 
+                 '.jpg HTTP/1.1' in log_message or 
+                 '.svg HTTP/1.1' in log_message)):
+                return False
+        except:
+            pass
+        return True
+
+# Apply the filter to suppress image 404 logs from werkzeug (Flask's request logger)
+werkzeug_logger = logging.getLogger('werkzeug')
+werkzeug_logger.addFilter(ImageNotFoundFilter())
+werkzeug_logger.setLevel(logging.WARNING)  # Only show warnings and errors, not INFO
 
 # Directory setup
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
@@ -110,15 +152,24 @@ from concurrent.futures import ThreadPoolExecutor
 import pytesseract
 import numpy as np
 
-# Add after existing imports
+# VTracer and related features availability check
 try:
-    import vtracer
-    import remove_text_simple
-    import png_to_svg_converter
-    PARALLEL_FEATURES_AVAILABLE = True
-except ImportError as e:
-    logger.warning(f"Parallel SVG features not available: {e}")
-    PARALLEL_FEATURES_AVAILABLE = False
+    # Test if vtracer is functional by checking its main function
+    vtracer.convert_image_to_svg_py
+    VTRACER_AVAILABLE = True
+    logger.info("✅ VTracer is available and functional")
+except (ImportError, AttributeError) as e:
+    logger.warning(f"⚠️ VTracer not available: {e}")
+    VTRACER_AVAILABLE = False
+
+# Check overall parallel features availability
+PARALLEL_FEATURES_AVAILABLE = VTRACER_AVAILABLE and REMOVE_TEXT_AVAILABLE
+if PARALLEL_FEATURES_AVAILABLE:
+    logger.info("🎉 Full parallel SVG features are available (VTracer + text removal)")
+elif VTRACER_AVAILABLE:
+    logger.info("⚡ Basic VTracer functionality is available (without text removal)")
+else:
+    logger.warning("❌ VTracer functionality is not available")
 
 # Unified storage directory - ALL files go here in organized sessions
 UNIFIED_STORAGE_DIR = os.path.join(IMAGES_DIR, 'sessions')
@@ -128,491 +179,152 @@ os.makedirs(UNIFIED_STORAGE_DIR, exist_ok=True)
 PARALLEL_OUTPUTS_DIR = os.path.join(IMAGES_DIR, 'parallel')
 os.makedirs(PARALLEL_OUTPUTS_DIR, exist_ok=True)
 
-def check_vector_suitability(user_input):
-    """Check if the prompt is suitable for SVG vector graphics"""
-    logger.info(f"Checking vector suitability for: {user_input[:100]}...")
-    
-    url = OPENAI_CHAT_ENDPOINT
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
-    }
-
-    payload = {
-        "model": PLANNER_MODEL,
-        "messages": [
-            {
-                "role": "system",
-                "content": """You are a vector graphics expert. Your task is to determine if a design request is suitable for SVG vector graphics.
-
-Guidelines for SVG suitability:
-1. Ideal for logos, icons, illustrations, typography, and geometric designs
-2. Good for flat or minimalist designs
-3. Suitable for designs with clear shapes and paths
-4. Works well with text and typography
-5. Perfect for scalable graphics without loss of quality
-
-Not suitable for:
-1. Photorealistic images
-2. Complex textures and gradients
-3. Designs requiring many minute details
-4. Photographs or photo manipulations
-5. Complex 3D renderings
-
-Provide guidance if the request isn't suitable."""
-            },
-            {
-                "role": "user",
-                "content": user_input
-            }
-        ],
-        "temperature": 0.7,
-        "max_tokens": 5000
-    }
-
-    response = requests.post(url, headers=headers, json=payload)
-    response_data = response.json()
-
-    if response.status_code != 200:
-        logger.error(f"Vector suitability check error: {response_data}")
-        return {"not_suitable": False}  # Default to allowing if check fails
-
-    analysis = response_data["choices"][0]["message"]["content"].lower()
-    not_suitable = "not suitable" in analysis or "unsuitable" in analysis
-    
-    return {
-        "not_suitable": not_suitable,
-        "guidance": response_data["choices"][0]["message"]["content"] if not_suitable else None
-    }
-
-def plan_design(user_input):
-    """Plan the design approach based on user input with enhanced focus on image generation quality"""
-    logger.info(f"Planning design for: {user_input[:100]}...")
-    
-    url = OPENAI_CHAT_ENDPOINT
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
-    }
-
-    # Use simplified, practical planning approach focused on concrete specifications
-    system_content = """You are a practical design planner. Create a clear, actionable plan for the design request that focuses on specific, implementable details.
-
-Your plan should include:
-1. Layout Structure
-   - Overall composition (centered, asymmetrical, grid-based)
-   - Key elements placement and sizing
-   - Visual hierarchy and focal points
-
-2. Typography Specifications
-   - Specific font recommendations (Google Fonts preferred)
-   - Font sizes and weights for different text elements
-   - Text alignment and spacing
-
-3. Color Scheme
-   - Primary background color
-   - Text colors for readability
-   - Accent colors for highlights
-   - Specific hex codes when possible
-
-4. Content Elements
-   - Main heading/title treatment
-   - Secondary text placement
-   - Decorative elements (borders, shapes, icons)
-   - Brand elements if applicable
-
-5. Technical Requirements
-   - Dimensions and aspect ratio
-   - File format considerations
-   - Quality standards for output
-
-Focus on creating a practical, implementable plan with specific details that can be directly used for design creation."""
-
-    payload = {
-        "model": PLANNER_MODEL,
-        "messages": [
-            {
-                "role": "system",
-                "content": system_content
-            },
-            {
-                "role": "user",
-                "content": user_input
-            }
-        ],
-        "temperature": 0.8,
-        "max_tokens":  6000
-    }
-
-    response = requests.post(url, headers=headers, json=payload)
-    response_data = response.json()
-
-    if response.status_code != 200:
-        logger.error(f"Design planning error: {response_data}")
-        return "Error in design planning"
-
-    return response_data["choices"][0]["message"]["content"]
-
-def generate_design_knowledge(design_plan, user_input):
-    """Generate specific design knowledge based on the plan and user input with focus on stunning visuals"""
-    logger.info("Generating design knowledge...")
-    
-    url = OPENAI_CHAT_ENDPOINT
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
-    }
-
-    # Use practical, actionable design knowledge approach
-    system_content = """You are a practical design knowledge expert. Provide specific, actionable design insights and best practices that can be directly implemented.
-
-Provide practical knowledge for:
-
-1. Typography Best Practices
-   - Recommended font combinations that work well together
-   - Optimal font sizes for different screen sizes and readability
-   - Proper line spacing and letter spacing guidelines
-   - Font loading and fallback strategies
-
-2. Color Theory Application
-   - Proven color combinations with hex codes
-   - Contrast ratios for accessibility compliance
-   - Background and text color pairings
-   - Brand-appropriate color choices
-
-3. Layout and Composition
-   - Grid systems and alignment principles
-   - White space utilization for clarity
-   - Visual hierarchy techniques
-   - Responsive design considerations
-
-4. Technical Implementation
-   - SVG optimization techniques
-   - File size management
-   - Cross-browser compatibility
-   - Performance optimization tips
-
-5. Quality Assurance
-   - Design consistency checkpoints
-   - Accessibility standards
-   - User experience considerations
-   - Testing and validation methods
-
-Focus on providing concrete, implementable advice that will directly improve design quality and user experience."""
-
-    payload = {
-        "model": DESIGN_KNOWLEDGE_MODEL,
-        "messages": [
-            {
-                "role": "system",
-                "content": system_content
-            },
-            {
-                "role": "user",
-                "content": f"Design Plan:\n{design_plan}\n\nUser Request:\n{user_input}"
-            }
-        ],
-        "temperature": 0.8,
-        "max_tokens": 15000
-    }
-
-    response = requests.post(url, headers=headers, json=payload)
-    response_data = response.json()
-
-    if response.status_code != 200:
-        logger.error(f"Design knowledge generation error: {response_data}")
-        return "Error in generating design knowledge"
-
-    return response_data["choices"][0]["message"]["content"]
-
-def pre_enhance_prompt(user_input):
-    """Initial enhancement of user query using proven examples and detailed specifications"""
-    logger.info(f"Pre-enhancing prompt: {user_input[:100]}...")
-    
-    url = OPENAI_CHAT_ENDPOINT
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
-    }
-
-    payload = {
-        "model": PRE_ENHANCER_MODEL,
-        "messages": [
-            {
-                "role": "system",
-                "content": """You are an expert prompt enhancer specializing in creating detailed, comprehensive prompts that generate exceptional graphic designs. Your task is to transform basic user requests into rich, detailed prompts following the proven format from high-quality training examples.
-
-CRITICAL REQUIREMENTS:
-1. Follow the EXACT format structure from the examples below
-2. Include comprehensive layout descriptions with specific positioning
-3. Specify exact fonts, sizes, and styling details  
-4. Define precise color schemes with background and text colors
-5. Detail decorative elements and their placement
-6. Ensure professional typography hierarchy
-7. Create prompts that result in visually stunning, usable designs
-
-TESTIMONIAL DESIGN FORMAT (use this structure for testimonials):
-"Create a testimonial with a [background color] background featuring a [container description]. The layout includes a [title description] at the [position], styled with the [font name] font, placed [positioning details]. Below, there are [decorative element count and description] arranged [arrangement], adding [visual effect]. The body text, written in [font name] font, is [positioning] and displays [content description], ensuring [quality requirement]. Finally, include [additional elements] to enhance [design goal].
-
-**Image:** No image
-**Fonts:** [Font 1], [Font 2], [Font 3]
-**Custom Elements:** [Element description] *[count]"
-
-COMING SOON DESIGN FORMAT (use this structure for coming soon pages):
-"Create a coming soon page with a [background description] background, featuring [main layout elements]. The layout includes [primary text] styled in [font details] at [size and positioning]. Below, [secondary elements] are positioned [placement details]. The design incorporates [decorative elements] with [color specifications] for [visual purpose]. Additional elements include [supporting content] in [font specifications], [positioning], ensuring [design quality]. The overall composition maintains [design principles] suitable for [target purpose].
-
-**Image:** No image  
-**Fonts:** [Font 1], [Font 2], [Font 3]
-**Custom Elements:** [Element description] *[count]"
-
-ENHANCED TRAINING EXAMPLES - USE THESE AS REFERENCE:
-
-TESTIMONIAL EXAMPLES:
-- "Create a testimonial with a teal background featuring a beige square container at the center. The layout includes a large bold 'TESTIMONIAL' text at the top, styled with the Alfarn font, placed in the middle of the container. Below, there are three decorative circles in orange arranged horizontally, adding a playful touch. The body text, written in PT Serif font, is centered and displays a series of lines about customer experience, ensuring a clear and engaging read. Finally, include square quotation marks on either side of the testimonial text to enhance the visual appeal and authenticity.
-
-**Image:** No image
-**Fonts:** Alfarn, PT Serif, Aileron  
-**Custom Elements:** Square quotation marks *2"
-
-- "Create a testimonial with a white background featuring a large pink circle at the center. The layout includes testimonial text placed centrally with multiple lines, and the customer's name at the bottom. Decoratively, there are four 4-spoke stars located in each corner of the design and a dotted circle element subtly integrated around the testimonial. The text is styled using the Raleway font, with the testimonial text in a size of 42, and the customer's name in a larger size of 48, both in black and dark blue respectively. The design maintains a clean, professional appearance suitable for showcasing customer feedback.
-
-**Image:** No image
-**Fonts:** Raleway
-**Custom Elements:** 4 spoke star *4, dotted circle"
-
-MANDATORY ENHANCEMENTS:
-- Always specify exact font names, sizes, and styling
-- Include precise color specifications (hex codes when possible)
-- Detail container shapes, borders, and backgrounds
-- Specify text positioning and alignment
-- Include decorative elements count and placement
-- Ensure responsive and accessible design principles
-- Add professional finishing touches
-
-Transform the user's request into this comprehensive format while maintaining design excellence and usability."""
-            },
-            {
-                "role": "user",
-                "content": user_input
-            }
-        ],
-        "temperature": 1,
-        "max_tokens":  6000
-    }
-
-    logger.info(f"Calling OpenAI Chat API for initial prompt enhancement with model: {PRE_ENHANCER_MODEL}")
-    response = requests.post(url, headers=headers, json=payload)
-    response_data = response.json()
-
-    if response.status_code != 200:
-        logger.error(f"OpenAI API error: {response_data}")
-        logger.error(f"Response status code: {response.status_code}")
-        logger.error(f"Response headers: {response.headers}")
-        raise Exception(f"OpenAI API error: {response_data.get('error', {}).get('message', 'Unknown error')}")
-
-    enhanced_prompt = response_data["choices"][0]["message"]["content"]
-    logger.info(f"Successfully enhanced prompt. Result: {enhanced_prompt[:100]}...")
-    return enhanced_prompt
-
-def enhance_prompt_with_chat(user_input):
-    """Enhance user prompt using Chat Completions API with proven quality requirements"""
-    url = OPENAI_CHAT_ENDPOINT
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
-    }
-
-    payload = {
-        "model": PROMPT_ENHANCER_MODEL,
-        "messages": [
-            {
-                "role": "system",
-                "content": """You are an expert SVG prompt enhancer specializing in transforming design concepts into ultra-detailed, comprehensive prompts that generate exceptional SVG graphics. Your role is to take the enhanced design descriptions and convert them into precise technical specifications for SVG generation.
-
-CRITICAL SVG ENHANCEMENT REQUIREMENTS:
-1. Convert design descriptions into detailed SVG technical specifications
-2. Specify exact SVG elements, attributes, and styling
-3. Include precise positioning with viewBox and coordinate systems  
-4. Define comprehensive color schemes with hex codes
-5. Detail font loading, sizing, and text positioning
-6. Specify all decorative elements as SVG shapes
-7. Ensure responsive, scalable, and accessible SVG code
-
-SVG TECHNICAL SPECIFICATIONS TO INCLUDE:
-- ViewBox dimensions and aspect ratio
-- SVG namespace and proper DOCTYPE
-- Font loading via <defs> and @font-face
-- Text elements with precise x,y positioning
-- Shape elements (rect, circle, path, polygon) with exact coordinates
-- Color gradients and fills with hex values
-- Text styling (font-family, font-size, font-weight, text-anchor)
-- Group elements for proper layering
-- Responsive scaling considerations
-
-MANDATORY SVG QUALITY REQUIREMENTS:
-- All SVG code must be semantically meaningful and well-structured
-- Text and background colors must have sufficient contrast (WCAG AA compliant)
-- All elements must be properly centered and aligned within the viewBox
-- Font loading must use both @font-face and fallback fonts
-- All coordinates and sizing must create visually balanced compositions
-- SVG must be optimized for both web display and print quality
-- Code must be clean, properly indented, and easily maintainable
-
-ENHANCEMENT PROCESS:
-1. Analyze the design description for layout, colors, fonts, and elements
-2. Create detailed SVG structure with proper element hierarchy
-3. Specify exact positioning for all text and graphical elements
-4. Include comprehensive styling with CSS-in-SVG or inline styles
-5. Add responsive considerations and accessibility features
-6. Ensure cross-browser compatibility and performance optimization
-
-Transform the design description into a comprehensive SVG specification that will generate professional, pixel-perfect graphics."""
-            },
-            {
-                "role": "user",
-                "content": user_input
-            }
-        ],
-        "temperature": 1,
-        "max_tokens": 8000
-    }
-
-    logger.info(f"Calling OpenAI Chat API for prompt enhancement with model: {PROMPT_ENHANCER_MODEL}")
-    response = requests.post(url, headers=headers, json=payload)
-    response_data = response.json()
-
-    if response.status_code != 200:
-        logger.error(f"OpenAI API error: {response_data}")
-        raise Exception(f"OpenAI API error: {response_data.get('error', {}).get('message', 'Unknown error')}")
-
-    return response_data["choices"][0]["message"]["content"]
-
 def enhance_prompt_for_gpt_image(user_prompt, design_context=None):
-    """Enhance user prompt using OpenAI specifically for GPT Image-1 to create mind-blowing designs"""
+    """Single optimized prompt enhancement for GPT Image-1 based on 2024 best practices"""
     logger.info(f"Enhancing prompt for GPT Image-1: {user_prompt[:100]}...")
     
     url = OPENAI_CHAT_ENDPOINT
     headers = {
-        "Content-Type": "application/json",
+        "Content-Type": "application/json", 
         "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
     }
 
-    # Analyze prompt to determine design type for specialized enhancement
-    prompt_lower = user_prompt.lower()
-    is_coming_soon = any(word in prompt_lower for word in ['coming soon', 'coming', 'soon', 'announcement', 'launch', 'reveal'])
-    is_testimonial = any(word in prompt_lower for word in ['testimonial', 'review', 'quote', 'feedback', 'recommendation'])
-    is_poster = any(word in prompt_lower for word in ['poster', 'flyer', 'announcement', 'event'])
+    # Create optimized system prompt based on GPT-4 image generation best practices
+    system_prompt = """You are an expert GPT-Image-1 (DALL-E 3) prompt enhancement specialist. Your role is to transform basic user image requests into sophisticated, optimized prompts that produce professional, "next-level" image outputs.
 
-    # Create specialized system prompt based on design type
-    if is_coming_soon:
-        system_prompt = """You are an expert prompt enhancer for GPT Image-1, specializing in creating EXCEPTIONAL "Coming Soon" graphics following the proven format structure from high-quality training examples. Transform user requests into comprehensive, detailed prompts that generate visually stunning coming soon designs.
+IMPORTANT: For this task, avoid using gradient shapes or elements with gradients. Use clear, structured, and solid shapes with strong contrast. Avoid shapes or elements that have similar shades or colors as the background, as these are difficult for vectorization tools like VTracer to identify. All main elements should be visually distinct from the background and from each other, with no subtle gradients or blending. Use flat, solid colors for all shapes and ensure good separation between elements and background.
 
-CRITICAL FORMAT REQUIREMENTS FOR COMING SOON PAGES:
-Use this EXACT structure: "Create a coming soon page with a [background description] background, featuring [main layout elements]. The layout includes [primary text] styled in [font details] at [size and positioning]. Below, [secondary elements] are positioned [placement details]. The design incorporates [decorative elements] with [color specifications] for [visual purpose]. Additional elements include [supporting content] in [font specifications], [positioning], ensuring [design quality]. The overall composition maintains [design principles] suitable for [target purpose]."
+Core Enhancement Methodology
+Transform user inputs using this proven structure:
+[Core Subject] + [Setting/Environment] + [Style/Artistic Direction] + [Lighting/Mood] + [Technical Details] + [Composition/Perspective]
+Key Principles:
 
-MANDATORY ELEMENTS TO SPECIFY:
-1. BACKGROUND: Specific color/texture with hex codes (e.g., "black background with gray border")
-2. PRIMARY TEXT: "COMING SOON" styling with exact fonts and sizes (e.g., "Bebas Neue font in large size")
-3. TYPOGRAPHY HIERARCHY: Main title, subtitle, supporting text with specific fonts
-4. DECORATIVE ELEMENTS: Exact count and placement (e.g., "three decorative circles", "star shapes")
-5. LAYOUT STRUCTURE: Centered, bordered, container-based designs
-6. COLOR SPECIFICATIONS: Background, text, accent colors with hex codes
-7. SUPPORTING CONTENT: Website links, dates, company names with positioning
+Use natural, conversational language (NOT keyword lists)
+Aim for 30-50 words for optimal results
+Include rich contextual details and environmental descriptions
+Leverage DALL-E 3's synthetic captioning strengths
+Focus on complete sentences and narrative descriptions
 
-PROVEN SUCCESSFUL EXAMPLES TO FOLLOW:
-- Black background with gray border, Bebas Neue font for "COMING" and "SOON", Allura decorative fonts
-- Deep blue background with white/orange Tektur font, shadows and white lines, rotated composition
-- Beige background with modern fonts, cursive and bold combinations, decorative SVG elements
-- Light beige with dark brown "COMING SOON", Open Sans dates, minimalist approach
-- Dark green natural theme with Bebas Neue, countdown sections, angled graphics
+Enhancement Framework
+1. Quality Enhancement Keywords (integrate naturally):
 
-TECHNICAL SPECIFICATIONS:
-- Size: 1024x1024 pixels optimized for GPT Image-1
-- High contrast for dramatic impact and readability
-- Bold, attention-grabbing typography
-- Professional color psychology for anticipation
-- Balanced composition with premium aesthetics
-- Mobile-responsive design considerations
+Technical: "highly detailed," "professional photography," "studio quality," "award-winning"
+Artistic: "trending on ArtStation," "masterpiece," "hyperrealistic," "cinematic"
+Photographic: "shallow depth of field," "perfect composition," "professional lighting"
 
-Transform the user's coming soon request into this comprehensive format ensuring maximum visual impact and professional quality."""
+2. Lighting Enhancement (choose appropriate):
 
-    elif is_testimonial:
-        system_prompt = """You are an expert prompt enhancer for GPT Image-1, specializing in creating EXCEPTIONAL testimonial graphics following the proven format structure from high-quality training examples. Transform user requests into comprehensive, detailed prompts that generate professional testimonial designs.
+Dramatic: "cinematic lighting," "dramatic shadows," "rim lighting"
+Professional: "studio lighting," "soft diffused light," "key lighting"
+Atmospheric: "golden hour," "ethereal glow," "moody lighting"
+Natural: "natural daylight," "window light," "ambient lighting"
 
-CRITICAL FORMAT REQUIREMENTS FOR TESTIMONIALS:
-Use this EXACT structure: "Create a testimonial with a [background color] background featuring a [container description]. The layout includes a [title description] at the [position], styled with the [font name] font, placed [positioning details]. Below, there are [decorative element count and description] arranged [arrangement], adding [visual effect]. The body text, written in [font name] font, is [centered/positioned] and displays [content description], ensuring [quality requirement]. Finally, include [additional elements] to enhance [design goal]."
+3. Composition Control:
 
-MANDATORY ELEMENTS TO SPECIFY:
-1. BACKGROUND: Specific color with hex code (e.g., "teal background #14B8A6")
-2. CONTAINER: Shape, size, positioning (e.g., "beige square container at center")
-3. TITLE: Exact text, font, size, positioning (e.g., "'TESTIMONIAL' in bold Alfarn font")
-4. DECORATIVE ELEMENTS: Count, type, arrangement (e.g., "three orange circles arranged horizontally")
-5. BODY TEXT: Font, size, positioning, content structure
-6. ATTRIBUTION: Customer name, styling, placement
-7. VISUAL ELEMENTS: Stars, quotes, borders, graphics with exact specifications
+Camera Angles: eye level, bird's eye view, low angle, high angle
+Shot Types: close-up, medium shot, wide shot, extreme close-up
+Technical Specs: 85mm portrait lens, 24mm wide-angle, f/1.4 aperture
 
-PROVEN SUCCESSFUL EXAMPLES TO FOLLOW:
-- Teal background with beige square container, Alfarn font titles, PT Serif body text, orange circles, square quotation marks
-- White background with large pink circle, Raleway font, 4-spoke stars in corners, dotted circle elements
-- Mint green background with red titles, white rounded rectangles, five blue stars for ratings
-- Golden background with white containers, Courier Std headings, five red five-spoke stars
+4. Style Direction (match to purpose):
 
-TECHNICAL SPECIFICATIONS:
-- Size: 1024x1024 pixels optimized for GPT Image-1
-- High contrast text for readability (WCAG AA compliant)
-- Professional typography hierarchy
-- Balanced composition with proper spacing
-- Trust-building color psychology
-- Clean, modern aesthetic
+Corporate/Professional: "clean modern design," "minimalist style," "professional aesthetic"
+Marketing: "vibrant colors," "eye-catching design," "commercial photography style"
+Artistic: "oil painting style," "digital art," "watercolor technique"
 
-Transform the user's testimonial request into this comprehensive format ensuring visual excellence and professional credibility."""
+Specialized Enhancement Rules
+POSTERS (Coming Soon, Events, Marketing):
+Formula: "Professional [poster type] featuring [main element], [style description], [color scheme], [mood/atmosphere], [technical quality], [composition notes]"
 
-    elif is_poster:
-        system_prompt = """You are an expert prompt enhancer for GPT Image-1, specializing in creating MIND-BLOWING posters that capture attention and communicate effectively. Transform user requests into detailed prompts for generating visually stunning poster designs.
+Enhancement Focus:
+- Clear hierarchy and focal points
+- Bold, readable typography integration
+- Brand-appropriate color schemes
+- Marketing-optimized composition
+- High-impact visual elements
 
-Your enhanced prompts should focus on:
-1. VISUAL IMPACT: Bold compositions, striking imagery, attention-grabbing elements
-2. TYPOGRAPHY: Powerful headlines, clear hierarchy, readable text
-3. COLOR SCHEMES: Vibrant, purposeful color palettes that match the message
-4. LAYOUT: Balanced composition, clear focal points, effective use of space
-5. MOOD & MESSAGE: Appropriate atmosphere that supports the poster's purpose
-6. TECHNICAL SPECS: 1024x1024, high contrast, print-ready quality
+Example Enhancement:
+User: "coming soon poster"
+Enhanced: "Professional 'Coming Soon' marketing poster featuring bold typography and anticipation-building imagery, modern minimalist design with vibrant brand colors, dramatic lighting creating excitement, studio-quality commercial photography style, centered composition with clear visual hierarchy."
+LOGOS (Brand Identity, Business):
+Formula: "Flat vector logo design for [business type], [design elements], [color scheme], [style notes], scalable vector format"
 
-Enhancement Guidelines:
-- Use descriptive words for visual impact and mood
-- Specify exact color palettes and typography styles
-- Include composition and layout details
-- Add texture and effect specifications
-- Focus on the poster's purpose and target audience
+Enhancement Focus:
+- Emphasize "flat vector design" and "scalable"
+- Minimalist, clean aesthetics
+- Professional color schemes
+- Clear symbolic representation
+- Timeless design principles
 
-Return ONLY the enhanced prompt optimized for GPT Image-1, no explanations."""
+Example Enhancement:
+User: "tech startup logo"
+Enhanced: "Flat vector logo design for innovative tech startup, featuring abstract geometric symbol representing growth and connectivity, modern blue and silver color palette, minimalist professional style with clean lines, scalable vector format suitable for all applications."
+TESTIMONIALS (Reviews, Social Proof):
+Formula: "Professional testimonial graphic featuring [layout description], [trust elements], [design style], [color scheme], [quality specifications]"
 
-    else:
-        system_prompt = """You are an expert prompt enhancer for GPT Image-1, specializing in creating MIND-BLOWING graphic designs that are visually stunning and professionally crafted. Transform user requests into detailed prompts optimized for GPT Image-1.
+Enhancement Focus:
+- Trust-building visual elements
+- Clean, readable layouts
+- Professional photography style
+- Space for customer photos and quotes
+- Platform-optimized dimensions
 
-Your enhanced prompts should focus on:
-1. VISUAL EXCELLENCE: Premium quality, professional finish, striking aesthetics
-2. COMPOSITION: Balanced layouts, clear hierarchy, effective use of space
-3. COLOR & STYLE: Sophisticated palettes, modern aesthetics, brand-appropriate
-4. TYPOGRAPHY: Professional fonts, readable text, proper hierarchy
-5. TECHNICAL QUALITY: 1024x1024, high resolution, crisp details
-6. PURPOSE: Design that serves its intended function effectively
+Example Enhancement:
+User: "customer testimonial"
+Enhanced: "Professional testimonial graphic featuring clean modern layout with space for customer photo and quote text, trust-building design elements including star ratings, soft professional lighting, corporate blue and white color scheme, high-quality marketing material style."
+Advanced Enhancement Techniques
+Conversational Prompting:
 
-Enhancement Guidelines:
-- Use descriptive, specific language for visual elements
-- Include technical specifications for optimal GPT Image-1 output
-- Specify colors, fonts, layouts, and effects in detail
-- Focus on professional, high-quality results
+Transform keywords into natural descriptions
+Add environmental context and relationships
+Include emotional and atmospheric details
+Specify material textures and surface qualities
 
-Return ONLY the enhanced prompt optimized for GPT Image-1, no explanations."""
+Mood-First Enhancement:
 
-    # Prepare the user content
-    user_content = f"Original request: {user_prompt}"
-    if design_context:
-        user_content += f"\n\nDesign context: {design_context[:300]}..."
+Start with emotional tone and atmosphere
+Build subject details around mood
+Include sensory descriptions
+Add temporal and seasonal context
+
+Technical Optimization:
+
+Specify appropriate aspect ratios (square for social, landscape for banners, portrait for posters)
+Include style settings guidance (vivid for marketing, natural for professional)
+Add resolution and quality specifications
+Mention lighting setup and camera techniques
+
+Output Format
+Always provide:
+
+Enhanced Prompt: The complete, optimized prompt (30-50 words)
+Key Enhancements: Brief explanation of major improvements made
+Technical Notes: Any specific settings or considerations for best results
+Alternative Version: A second variation with different style/mood (if helpful)
+
+Quality Checklist
+Before finalizing each enhancement, verify:
+
+✅ Uses natural, conversational language
+✅ Includes complete environmental context
+✅ Incorporates appropriate quality keywords
+✅ Specifies lighting and mood clearly
+✅ Matches optimal word count (30-50 words)
+✅ Optimized for specific image type/purpose
+✅ Includes technical and composition details
+✅ Maintains user's core intent while maximizing quality
+
+Important Notes
+
+Focus on rich contextual descriptions rather than keyword lists
+Leverage DALL-E 3's strength in understanding relationships and environments
+Always maintain the user's original intent while dramatically improving specificity
+Consider the final use case (social media, print, web, branding) in enhancement decisions
+Remember that DALL-E 3 excels with complete scene descriptions including background elements
+
+Transform every basic request into a sophisticated prompt that unlocks DALL-E 3's full potential for professional, next-level image generation."""
 
     payload = {
-        "model": PROMPT_ENHANCER_MODEL,
+        "model": "gpt-4.1-mini",
         "messages": [
             {
                 "role": "system",
@@ -620,51 +332,41 @@ Return ONLY the enhanced prompt optimized for GPT Image-1, no explanations."""
             },
             {
                 "role": "user",
-                "content": user_content
+                "content": f" {user_prompt}"
             }
         ],
         "temperature": 0.8,
-        "max_tokens": 8000
+        "max_tokens": 1000
     }
 
     try:
-        logger.info(f"Calling OpenAI for GPT Image-1 prompt enhancement with model: {PROMPT_ENHANCER_MODEL}")
+        logger.info("Calling OpenAI Chat API for optimized prompt enhancement")
         response = requests.post(url, headers=headers, json=payload)
         response_data = response.json()
 
         if response.status_code != 200:
-            logger.error(f"OpenAI API error for GPT Image enhancement: {response_data}")
-            # Fallback to original prompt if API fails
+            logger.error(f"OpenAI API error: {response_data}")
             return user_prompt
 
-        enhanced_prompt = response_data["choices"][0]["message"]["content"].strip()
-        
-        # Ensure prompt isn't too long for GPT Image-1
-        if len(enhanced_prompt) > 1000:
-            enhanced_prompt = enhanced_prompt[:1000] + "..."
-        
-        logger.info(f"Successfully enhanced prompt for GPT Image-1: {enhanced_prompt[:100]}...")
+        enhanced_prompt = response_data["choices"][0]["message"]["content"]
+        logger.info(f"Successfully enhanced prompt. Result: {enhanced_prompt[:100]}...")
         return enhanced_prompt
 
     except Exception as e:
-        logger.error(f"Error enhancing prompt for GPT Image-1: {str(e)}")
-        # Return original prompt as fallback
+        logger.error(f"Error enhancing prompt: {str(e)}")
         return user_prompt
 
 def generate_image_with_gpt(enhanced_prompt, design_context=None):
     """Generate image using GPT Image-1 model with enhanced prompting"""
     try:
         logger.info("Generating image with GPT Image-1")
-
-        # Enhance the prompt specifically for GPT Image-1
-        optimized_prompt = enhance_prompt_for_gpt_image(enhanced_prompt, design_context)
-        logger.info(f"Optimized prompt: {optimized_prompt[:200]}...")
+        logger.info(f"Using prompt: {enhanced_prompt[:200]}...")
 
         response = openai.images.generate(
             model=GPT_IMAGE_MODEL,
-            prompt=optimized_prompt,
+            prompt=enhanced_prompt,
             size="1024x1024",
-            quality="low"   # Changed from "low" to "standard" for better quality
+            quality="medium"   # Changed from "low" to "standard" for better quality
         )
 
         # Get base64 image data from the response
@@ -687,15 +389,109 @@ def generate_image_with_gpt(enhanced_prompt, design_context=None):
         logger.error(f"Error generating image with GPT Image-1: {str(e)}")
         raise
 
-def generate_svg_from_image(image_base64, enhanced_prompt):
-    """Generate SVG code from image - vtracer temporarily disabled for deployment"""
-    logger.info(f"SVG generation from image requested - vtracer temporarily disabled")
+def generate_svg_from_image(image_base64, enhanced_prompt, use_preprocessing=False):
+    """Generate SVG code from image using VTracer with optimized processing"""
+    logger.info(f"SVG generation from image using VTracer")
     logger.info(f"Enhanced prompt provided: {enhanced_prompt[:100]}...")
     logger.info(f"Image data size: {len(image_base64)} characters")
+    logger.info(f"Preprocessing enabled: {use_preprocessing}")
     
-    # For now, return a message indicating vtracer is disabled
-    # In the future, you can implement an alternative approach or re-enable vtracer
-    raise NotImplementedError("Image-to-SVG conversion temporarily disabled due to deployment constraints. Please use text-based SVG generation instead.")
+    if not VTRACER_AVAILABLE:
+        logger.error("VTracer not available - missing core dependency")
+        raise NotImplementedError("VTracer not available - missing core dependency. Please install vtracer.")
+    
+    try:
+        # Decode base64 image data
+        image_data = base64.b64decode(image_base64)
+        
+        # Create session for this conversion
+        session_id = f"vtracer_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+        
+        # Save the original image bytes to a temporary PNG file
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        temp_input_path = f"temp_input_{timestamp}_{uuid.uuid4()}.png"
+        
+        with open(temp_input_path, "wb") as f:
+            f.write(image_data)
+        
+        logger.info(f"Saved temporary image: {temp_input_path}")
+        
+        # Optional preprocessing for better VTracer results
+        processing_path = temp_input_path
+        if use_preprocessing:
+            try:
+                logger.info("Applying VTracer preprocessing...")
+                processing_path = preprocess_for_vtracer(temp_input_path)
+                logger.info(f"Preprocessing completed: {processing_path}")
+            except Exception as e:
+                logger.warning(f"Preprocessing failed, using original image: {str(e)}")
+                processing_path = temp_input_path
+        
+        # Convert the image to SVG using vtracer with improved settings
+        svg_filename, svg_relative_path, _ = save_svg("", prefix="vtracer_svg", session_id=session_id)
+        output_svg_path = os.path.join(IMAGES_DIR, svg_relative_path)
+        
+        logger.info("Converting image to SVG using VTracer with high detail settings...")
+        vtracer.convert_image_to_svg_py(
+            processing_path,
+            output_svg_path,
+            # Clustering settings
+            colormode='color',         # Color mode (not B/W)
+            hierarchical='stacked',    # Stacked mode for layering
+            
+            # Filter settings
+            filter_speckle=1,         # Less filtering, keep more small elements
+            
+            # Color and precision settings
+            color_precision=3,        # More color detail
+            layer_difference=16,      # More layers
+            
+            # Curve fitting settings
+            mode='spline',            # Smooth curves
+            corner_threshold=30,      # More corners
+            length_threshold=1.0,     # Keep short paths
+            splice_threshold=20,      # Less aggressive merging
+            
+            # Additional optimization settings
+            max_iterations=20,        # More refinement
+            path_precision=2          # Higher precision
+        )
+        
+        # Read the generated SVG content
+        with open(output_svg_path, 'r', encoding='utf-8') as f:
+            svg_code = f.read()
+        
+        # Clean up temporary files
+        cleanup_files = [temp_input_path]
+        if use_preprocessing and processing_path != temp_input_path:
+            cleanup_files.append(processing_path)
+            
+        for file_path in cleanup_files:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        
+        logger.info(f"VTracer SVG generation completed successfully")
+        logger.info(f"Generated SVG size: {len(svg_code)} characters")
+        logger.info(f"SVG saved to session: {session_id}")
+        
+        return svg_code
+        
+    except Exception as e:
+        # Clean up temporary files on error
+        cleanup_files = []
+        if 'temp_input_path' in locals() and os.path.exists(temp_input_path):
+            cleanup_files.append(temp_input_path)
+        if 'processing_path' in locals() and processing_path != temp_input_path and os.path.exists(processing_path):
+            cleanup_files.append(processing_path)
+            
+        for file_path in cleanup_files:
+            try:
+                os.remove(file_path)
+            except:
+                pass
+        
+        logger.error(f"Error in VTracer SVG generation: {str(e)}")
+        raise Exception(f"VTracer SVG generation failed: {str(e)}")
 
 def clean_svg_code_original(svg_code):
     """Original clean and validate SVG code function"""
@@ -873,90 +669,26 @@ def generate_svg():
         logger.info(f"Starting new design request: {user_input}")
         logger.info("="*80)
 
-        # Stage 1: Check if prompt is suitable for SVG vector graphics
-        logger.info("\n[STAGE 1: Vector Suitability Check]")
+        # Single Stage: Optimize prompt for GPT Image-1 generation
+        logger.info("\n[OPTIMIZED PROMPT ENHANCEMENT]")
         logger.info("-"*50)
-        logger.info("Checking if design is suitable for SVG format...")
-        vector_suitability = check_vector_suitability(user_input)
-        logger.info("Vector suitability check complete")
-        logger.info(f"Result: {'Suitable' if not vector_suitability.get('not_suitable', False) else 'Not Suitable'}")
+        logger.info("Enhancing prompt for GPT Image-1 generation...")
         
-        if vector_suitability.get('not_suitable', False):
-            logger.warning("Design request not suitable for SVG format")
-            return jsonify({
-                "error": "Not suitable for SVG",
-                "guidance": vector_suitability.get('guidance', "Your request may not be ideal for SVG vector graphics. Please consider a simpler, more graphic design oriented request."),
-                "progress_stage": "vector_suitability",
-                "progress": 10
-            }), 400
-        
-        # Stage 2: Planning Phase - Create structured design plan
-        logger.info("\n[STAGE 2: Planning Phase]")
-        logger.info("-"*50)
-        logger.info("Creating structured design plan...")
-        logger.info(f"Using model: {PLANNER_MODEL}")
-        design_plan = plan_design(user_input)
-        logger.info("\nDesign Plan Generated:")
-        for line in design_plan.split('\n')[:10]:  # Log first 10 lines of plan
-            logger.info(f"  {line}")
-        logger.info("  ...")
-        
-        # Stage 3: Design Knowledge Generation - Gather design best practices
-        logger.info("\n[STAGE 3: Design Knowledge Generation]")
-        logger.info("-"*50)
-        logger.info("Gathering design knowledge and best practices...")
-        logger.info(f"Using model: {DESIGN_KNOWLEDGE_MODEL}")
-        design_knowledge = generate_design_knowledge(design_plan, user_input)
-        logger.info("\nDesign Knowledge Generated:")
-        for line in design_knowledge.split('\n')[:10]:  # Log first 10 lines of knowledge
-            logger.info(f"  {line}")
-        logger.info("  ...")
-        
-        # Combine design plan and knowledge for enhanced prompts
-        logger.info("\nCombining design plan and knowledge...")
-        design_context = f"""Design Plan:
-{design_plan}
-
-Design Knowledge and Best Practices:
-{design_knowledge}
-
-Original Request:
-{user_input}"""
-        logger.info("Design context preparation complete")
-        
-        # Stage 4: Pre-Enhancement Phase - Convert to detailed format
-        logger.info("\n[STAGE 4: Pre-Enhancement Phase]")
-        logger.info("-"*50)
-        logger.info("Converting user input to detailed format using JSONL examples...")
-        logger.info(f"Using model: {PRE_ENHANCER_MODEL}")
-        pre_enhanced_prompt = pre_enhance_prompt(user_input)
-        logger.info("\nPre-Enhanced Prompt Generated:")
-        for line in pre_enhanced_prompt.split('\n')[:5]:  # Log first 5 lines
-            logger.info(f"  {line}")
-        logger.info("  ...")
-        
-        # Stage 5: SVG Enhancement Phase - Convert to SVG technical specs
-        logger.info("\n[STAGE 5: SVG Enhancement Phase]")
-        logger.info("-"*50)
-        logger.info("Converting design description to SVG technical specifications...")
-        logger.info(f"Using model: {PROMPT_ENHANCER_MODEL}")
-        enhanced_prompt = enhance_prompt_with_chat(pre_enhanced_prompt)
-        logger.info("\nSVG-Enhanced Prompt Generated:")
+        # Use the optimized prompt enhancement
+        enhanced_prompt = enhance_prompt_for_gpt_image(user_input)
+        logger.info("\nOptimized Prompt Generated:")
         for line in enhanced_prompt.split('\n')[:5]:  # Log first 5 lines
             logger.info(f"  {line}")
         logger.info("  ...")
-        
-        # Use the enhanced prompt for image generation
-        prompt_to_use = pre_enhanced_prompt  # Use pre-enhanced for GPT Image-1
 
-        # Stage 6: Generate image using GPT Image-1
-        logger.info("STAGE 6: Image Generation Phase")
-        gpt_image_base64, gpt_image_filename = generate_image_with_gpt(prompt_to_use, design_context)
+        # Generate image using GPT Image-1
+        logger.info("\n[IMAGE GENERATION PHASE]")
+        gpt_image_base64, gpt_image_filename = generate_image_with_gpt(enhanced_prompt, None)
         logger.info("Image generated with GPT Image-1")
 
-        # Stage 7: Generate SVG using vtracer
-        logger.info("STAGE 7: SVG Generation Phase")
-        svg_code = generate_svg_from_image(gpt_image_base64, prompt_to_use)
+        # Generate SVG using vtracer
+        logger.info("\n[SVG GENERATION PHASE]")
+        svg_code = generate_svg_from_image(gpt_image_base64, enhanced_prompt)
         logger.info("SVG code generated from image")
         
         # Save the SVG in the same session
@@ -964,7 +696,6 @@ Original Request:
 
         return jsonify({
             "original_prompt": user_input,
-            "pre_enhanced_prompt": pre_enhanced_prompt,
             "enhanced_prompt": enhanced_prompt,
             "gpt_image_base64": gpt_image_base64,
             "gpt_image_url": f"/static/images/{gpt_image_filename}",
@@ -1200,48 +931,13 @@ def chat_assistant():
                 # Create session ID for this chat conversation
                 chat_session_id = f"chat_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
                 
-                # Stage 1: Planning Phase
-                logger.info("\n[STAGE 1: Planning Phase]")
+                # Optimized Prompt Enhancement
+                logger.info("\n[OPTIMIZED PROMPT ENHANCEMENT]")
                 logger.info("-"*50)
-                logger.info("Creating structured design plan...")
-                logger.info(f"Using model: {PLANNER_MODEL}")
-                design_plan = plan_design(latest_message)
-                logger.info("\nDesign Plan Generated:")
-                for line in design_plan.split('\n')[:10]:
-                    logger.info(f"  {line}")
-                logger.info("  ...")
-
-                # Stage 2: Design Knowledge Generation
-                logger.info("\n[STAGE 2: Design Knowledge Generation]")
-                logger.info("-"*50)
-                logger.info("Gathering design knowledge and best practices...")
-                logger.info(f"Using model: {DESIGN_KNOWLEDGE_MODEL}")
-                design_knowledge = generate_design_knowledge(design_plan, latest_message)
-                logger.info("\nDesign Knowledge Generated:")
-                for line in design_knowledge.split('\n')[:10]:
-                    logger.info(f"  {line}")
-                logger.info("  ...")
-
-                # Stage 3: Pre-enhancement
-                logger.info("\n[STAGE 3: Pre-enhancement Phase]")
-                logger.info("-"*50)
-                logger.info("Pre-enhancing prompt with design context...")
-                logger.info(f"Using model: {PRE_ENHANCER_MODEL}")
-                design_context = f"""Design Plan:\n{design_plan}\n\nDesign Knowledge:\n{design_knowledge}\n\nOriginal Request:\n{latest_message}"""
-                pre_enhanced = pre_enhance_prompt(design_context)
-                logger.info("\nPre-enhanced Prompt:")
-                for line in pre_enhanced.split('\n')[:10]:
-                    logger.info(f"  {line}")
-                logger.info("  ...")
-
-                # Stage 4: Final Enhancement
-                logger.info("\n[STAGE 4: Final Enhancement Phase]")
-                logger.info("-"*50)
-                logger.info("Enhancing prompt with technical specifications...")
-                logger.info(f"Using model: {PROMPT_ENHANCER_MODEL}")
-                enhanced_prompt = enhance_prompt_with_chat(pre_enhanced)
+                logger.info("Enhancing prompt for GPT Image-1...")
+                enhanced_prompt = enhance_prompt_for_gpt_image(latest_message)
                 logger.info("\nEnhanced Prompt Generated:")
-                for line in enhanced_prompt.split('\n')[:10]:
+                for line in enhanced_prompt.split('\n')[:5]:
                     logger.info(f"  {line}")
                 logger.info("  ...")
                 
@@ -1372,174 +1068,84 @@ def chat_assistant():
         logger.exception("Full traceback:")
         return jsonify({"error": error_msg}), 500
 
-def build_advanced_image_prompt(user_input, design_context):
-    """Build an advanced image prompt optimized for creating stunning visuals"""
-    logger.info(f"Building advanced image prompt: {user_input[:100]}...")
-    
-    url = OPENAI_CHAT_ENDPOINT
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {OPENAI_API_KEY_ENHANCER}"
-    }
-
-    # Detect design type for specialized prompt building
-    user_lower = user_input.lower()
-    is_coming_soon = any(word in user_lower for word in ['coming soon', 'coming', 'soon', 'announcement', 'launch'])
-    is_testimonial = any(word in user_lower for word in ['testimonial', 'review', 'quote', 'feedback'])
-
-    if is_coming_soon:
-        system_content = """You are an expert at creating FINAL image generation prompts that produce VIRAL "Coming Soon" visuals. Take the enhanced prompt and design context to create the ultimate prompt for GPT Image-1 that will generate mind-blowing coming soon designs.
-
-Your final prompt must be optimized for:
-
-1. MAXIMUM VISUAL IMPACT
-   - Explosive composition that stops scrolling
-   - Dramatic lighting and effects that create wow factor
-   - Typography that commands immediate attention
-   - Color combinations that create emotional excitement
-
-2. GPT IMAGE-1 OPTIMIZATION
-   - Clear, specific visual descriptions for accurate generation
-   - Technical specifications for crisp 1024x1024 output
-   - Element separation for clean generation
-   - Prompt structure that maximizes generation quality
-
-3. COMING SOON SPECIALIZATION
-   - Language that triggers excitement and anticipation
-   - Visual elements that create buzz and shareability
-   - Design elements that scream "premium" and "exclusive"
-   - Composition that works perfectly for social media sharing
-
-Create a final prompt that will generate a coming soon image that goes viral."""
-
-    elif is_testimonial:
-        system_content = """You are an expert at creating FINAL image generation prompts that produce CONVERSION-OPTIMIZED testimonial visuals. Take the enhanced prompt and design context to create the ultimate prompt for GPT Image-1 that will generate trust-building testimonial designs.
-
-Your final prompt must be optimized for:
-
-1. MAXIMUM CREDIBILITY
-   - Professional composition that builds immediate trust
-   - Typography that enhances believability
-   - Color schemes that psychologically increase conversion
-   - Layout that guides eye flow to key conversion elements
-
-2. GPT IMAGE-1 OPTIMIZATION
-   - Clear specifications for accurate text and element generation
-   - Technical details for crisp professional output
-   - Element positioning for perfect testimonial structure
-   - Quality specifications for credible appearance
-
-3. TESTIMONIAL SPECIALIZATION
-   - Language that generates trust-building visuals
-   - Design elements that reduce skepticism
-   - Visual hierarchy that maximizes quote impact
-   - Professional aesthetics that enhance credibility
-
-Create a final prompt that will generate a testimonial that converts viewers into customers."""
-
-    else:
-        system_content = """You are an expert at creating FINAL image generation prompts that produce HIGH-IMPACT professional visuals. Take the enhanced prompt and design context to create the ultimate prompt for GPT Image-1.
-
-Your final prompt must be optimized for:
-
-1. MAXIMUM VISUAL APPEAL
-   - Professional composition that captures attention
-   - Typography and layout that serves the design purpose
-   - Color schemes that match the intended mood and audience
-   - Visual elements that enhance the design's effectiveness
-
-2. GPT IMAGE-1 OPTIMIZATION
-   - Clear specifications for accurate generation
-   - Technical details for high-quality output
-   - Element positioning for optimal composition
-   - Quality specifications for professional appearance
-
-3. PURPOSE-DRIVEN DESIGN
-   - Language that generates visuals matching the specific need
-   - Design elements that serve the intended function
-   - Professional aesthetics appropriate for the use case
-   - Balanced composition that works across platforms
-
-Create a final prompt that will generate exceptional professional visuals."""
-
-    payload = {
-        "model": PROMPT_ENHANCER_MODEL,
-        "messages": [
-            {
-                "role": "system",
-                "content": system_content
-            },
-            {
-                "role": "user",
-                "content": f"Enhanced Prompt: {user_input}\n\nDesign Context: {design_context[:500]}..."
-            }
-        ],
-        "temperature": 0.7,
-        "max_tokens": 8000
-    }
-
-    try:
-        logger.info("Calling OpenAI for advanced image prompt building")
-        response = requests.post(url, headers=headers, json=payload)
-        response_data = response.json()
-
-        if response.status_code != 200:
-            logger.error(f"OpenAI API error for advanced prompt building: {response_data}")
-            # Fallback to simplified prompt
-            return f"Create a stunning visual design: {user_input}. Professional quality, 1024x1024 resolution, high contrast, vibrant colors, clear typography, balanced composition."
-
-        final_prompt = response_data["choices"][0]["message"]["content"].strip()
-        
-        # Ensure prompt isn't too long for GPT Image-1
-        if len(final_prompt) > 1000:
-            final_prompt = final_prompt[:1000] + "..."
-        
-        logger.info(f"Successfully built advanced image prompt: {final_prompt[:100]}...")
-        return final_prompt
-
-    except Exception as e:
-        logger.error(f"Error building advanced image prompt: {str(e)}")
-        # Return simplified fallback
-        return f"Create a stunning visual design: {user_input}. Professional quality, 1024x1024 resolution, high contrast, vibrant colors, clear typography, balanced composition."
 
 def process_ocr_svg(image_data):
-    """Generate a text-only SVG using gpt-4o-mini by passing the image directly to the chat API."""
+    """Generate a text-only SVG using enhanced OCR and AI-powered text analysis"""
     if not PARALLEL_FEATURES_AVAILABLE:
         raise NotImplementedError("Parallel features not available - missing dependencies")
     
     # Base64-encode the PNG image
     img_b64 = base64.b64encode(image_data).decode('utf-8')
     
-    # Build prompts matching generate_svg_from_image style
-    system_prompt = """You are an expert SVG text generator. Your task is to create precise, clean SVG code that contains ONLY text elements from the provided image. Follow these guidelines:
-1. Create SVG with dimensions 1080x1080 pixels
-2. Only extract and reproduce text elements - no shapes, paths or other visual elements
-3. Use appropriate viewBox and preserveAspectRatio attributes
-4. Ensure text elements are properly positioned and styled
-5. Include necessary font definitions and text styles
-6. Match text colors exactly from the image
-7. Preserve text alignment and spacing
-8. Use semantic text grouping where appropriate
-9. Optimize text rendering for clarity
-10. Maintain exact text positioning from original image
+    # Enhanced system prompt for accurate text detection
+    system_prompt = """You are an expert OCR and SVG text specialist. Your task is to create PRECISE, ACCURATE SVG code that reproduces ALL text elements from the image with PERFECT positioning, sizing, and styling.
 
-Focus on producing clean SVG code that contains ONLY the text content from the input image.
-Return ONLY the SVG code without any explanations or comments."""
+CRITICAL REQUIREMENTS:
+
+1. **ACCURATE TEXT DETECTION**:
+   - Detect ALL text in the image, including titles, subtitles, body text, captions, labels
+   - Identify exact text content character by character
+   - Don't miss any text elements, no matter how small or faint
+
+2. **PRECISE FONT ANALYSIS**:
+   - Analyze font family (serif, sans-serif, decorative, script)
+   - Determine exact font weight (normal, bold, extra-bold)
+   - Identify font style (normal, italic, oblique)
+   - Estimate accurate font size in pixels
+
+3. **EXACT POSITIONING**:
+   - Measure precise x,y coordinates for each text element
+   - Use percentages or absolute pixels for accurate placement
+   - Maintain proper text alignment (left, center, right)
+   - Preserve line spacing and letter spacing
+
+4. **COLOR MATCHING**:
+   - Extract exact colors using hex codes (#RRGGBB)
+   - Match text colors precisely from the image
+   - Account for text shadows or effects if present
+
+5. **SVG STRUCTURE**:
+   - Use viewBox="0 0 1080 1080" and dimensions 1080x1080
+   - Include proper text-anchor attributes (start, middle, end)
+   - Use <defs> for font loading and styling
+   - Group related text elements logically
+
+6. **QUALITY STANDARDS**:
+   - Text must be crisp and readable
+   - Maintain proper hierarchy (titles larger than subtitles)
+   - Ensure text doesn't overlap unless intended
+   - Optimize for web rendering
+
+EXAMPLE STRUCTURE:
+```svg
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" width="1080" height="1080">
+  <defs>
+    <style>
+      .main-title { font-family: 'Arial Black', sans-serif; font-size: 120px; fill: #2E3A99; font-weight: bold; }
+      .subtitle { font-family: 'Arial', sans-serif; font-size: 48px; fill: #FFFFFF; font-weight: normal; }
+    </style>
+  </defs>
+  <text x="540" y="300" class="main-title" text-anchor="middle">EXACT TEXT</text>
+  <text x="540" y="400" class="subtitle" text-anchor="middle">Subtitle Text</text>
+</svg>
+```
+
+Return ONLY the complete SVG code with ALL text elements accurately positioned and styled."""
 
     user_content = [
-        {"type": "text", "text": "Generate an SVG that contains only text elements exactly as seen in the image."},
+        {"type": "text", "text": "Analyze this image and extract ALL text elements with PRECISE positioning, font sizing, colors, and styling. Create accurate SVG code that reproduces the text exactly as shown in the image."},
         {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_b64}"}}
     ]
     
-    # Call Chat Completions API directly to support image_url message
+    # Call Chat Completions API directly to support image_url message with enhanced parameters
     payload = {
-        "model": "gpt-4o-mini",
+        "model": "gpt-4.1-mini",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content}
         ],
-        "temperature": 1,
-        "max_tokens": 8000
+        "temperature": 1,  # Lower temperature for more consistent text detection
+        "max_tokens": 12000,  # More tokens for detailed SVG output# Avoid repetitive patterns
     }
     
     url = "https://api.openai.com/v1/chat/completions"
@@ -1577,22 +1183,7 @@ def process_background_extraction(image_data):
         img_b64 = base64.b64encode(image_data).decode('utf-8')
         
         # First, analyze the background with gpt-4o-mini vision
-        system_prompt = """You are an expert image background extractor. Your task is to analyze the provided image and extract ONLY the core background colors and gradients, ignoring all other elements.
-
-Focus exclusively on:
-- The main background color(s)
-- Any color gradients in the background
-- Basic background patterns if present
-- Overall background tone and feel
-
-DO NOT include or describe:
-- Any text elements
-- Icons or logos
-- Graphical shapes or designs
-- Borders or frames
-- Decorative elements
-
-Provide a minimal description focused purely on recreating the base background colors/gradients."""
+        system_prompt = """You are an expert image background extractor. Your task is to analyze the provided image and extract ONLY the core background colors and gradients, ignoring all other elements.\n\nIMPORTANT: Your goal is to generate a background image that matches the background of the provided image as closely as possible. Do not add, invent, or hallucinate any new elements, shapes, icons, or decorations. The generated background should be pixel-perfect or as visually identical as possible to the background of the input image, including all colors, gradients, and patterns, but must not include any text, icons, logos, or foreground elements.\n\nFocus exclusively on:\n- The main background color(s)\n- Any color gradients in the background\n- Basic background patterns if present\n- Overall background tone and feel\n\nDO NOT include or describe:\n- Any text elements\n- Icons or logos\n- Graphical shapes or designs\n- Borders or frames\n- Decorative elements\n\nProvide a minimal description focused purely on recreating the base background colors/gradients, and ensure the generated background is as close as possible to the original image's background."""
 
         user_content = [
             {"type": "text", "text": "Analyze this image and describe only the background elements in detail, ignoring all text and main graphic elements."},
@@ -1698,22 +1289,33 @@ def process_clean_svg(image_data):
         final_edited_path = remove_text_simple.remove_text(temp_input_path)
         logger.info("Text removed from image, proceeding with V-Tracer for element isolation...")
 
-        # Convert the final edited PNG to SVG using vtracer with optimized settings
+        # Preprocess for vtracer: use gradient-friendly preprocessing
+        pre_vtracer_path = preprocess_for_gradients(final_edited_path)
+
         output_svg_path = os.path.join(IMAGES_DIR, f"elements_{timestamp}_{uuid.uuid4().hex[:8]}.svg")
         vtracer.convert_image_to_svg_py(
-            final_edited_path,
+            pre_vtracer_path,
             output_svg_path,
-            colormode='color',
-            hierarchical='stacked',
-            mode='spline',
-            filter_speckle=4,
-            color_precision=6,
-            layer_difference=16,
-            corner_threshold=60,
-            length_threshold=4.0,
-            max_iterations=10,
-            splice_threshold=45,
-            path_precision=3
+            # Clustering settings
+            colormode='color',         # Color mode (not B/W)
+            hierarchical='stacked',    # Stacked mode for layering
+            
+            # Filter settings
+            filter_speckle=4,         # Filter Speckle (Cleaner) = 4
+            
+            # Color and precision settings
+            color_precision=6,        # Color Precision (More accurate) = 6
+            layer_difference=65,      # Gradient Step (Less layers) = 65
+            
+            # Curve fitting settings
+            mode='spline',            # Curve Fitting = Spline
+            corner_threshold=60,      # Corner Threshold (Smoother) = 60
+            length_threshold=4.0,     # Segment Length (More coarse) = 4
+            splice_threshold=45,      # Splice Threshold (Less accurate) = 45
+            
+            # Additional optimization settings
+            max_iterations=10,        # Standard iterations for quality
+            path_precision=3          # Good balance of precision and file size
         )
 
         # Read the generated SVG
@@ -1726,6 +1328,48 @@ def process_clean_svg(image_data):
         for temp_file in [temp_input_path]:
             if os.path.exists(temp_file):
                 os.remove(temp_file)
+
+def preprocess_for_vtracer(input_path):
+    """Improved preprocessing for VTracer to enhance element separation and detail"""
+    from PIL import Image, ImageOps, ImageEnhance, ImageFilter
+    import numpy as np
+    import cv2
+
+    img = Image.open(input_path).convert('RGB')
+    # Less aggressive posterization
+    img = ImageOps.posterize(img, 4)  # 4 bits = 16 colors per channel
+    # Increase contrast
+    enhancer = ImageEnhance.Contrast(img)
+    img = enhancer.enhance(1.5)
+    # Optional: Sharpen
+    img = img.filter(ImageFilter.SHARPEN)
+    # Convert to numpy for OpenCV denoising
+    img_np = np.array(img)
+    img_np = cv2.fastNlMeansDenoisingColored(img_np, None, 10, 10, 7, 21)
+    # Optional: Slight blur to reduce noise
+    img_np = cv2.GaussianBlur(img_np, (3, 3), 0.5)
+    pre_path = input_path.replace('.png', '_pre_vtracer.png')
+    Image.fromarray(img_np).save(pre_path)
+    return pre_path
+    
+def preprocess_for_gradients(input_path):
+    """Minimal preprocessing specifically for gradient-rich images"""
+    # Load image
+    img = Image.open(input_path).convert('RGB')
+    
+    # Very light posterization to maintain gradient smoothness
+    img = ImageOps.posterize(img, 6)  # ✅ 6 bits = 64 colors per channel
+    
+    # Convert to numpy array for OpenCV
+    img_np = np.array(img)
+    
+    # Very light gaussian blur to smooth small artifacts only
+    img_np = cv2.GaussianBlur(img_np, (3, 3), 0.5)
+    
+    # Save preprocessed image
+    pre_path = input_path.replace('.png', '_gradient_pre.png')
+    Image.fromarray(img_np).save(pre_path)
+    return pre_path
 
 
 
@@ -1860,42 +1504,19 @@ def generate_parallel_svg():
 
         logger.info('=== PARALLEL SVG PIPELINE START ===')
 
-        # Stage 2: Design Planning
-        logger.info('Stage 2: Design Planning')
-        design_plan = plan_design(user_input)
-
-        # Stage 3: Design Knowledge Generation
-        logger.info('Stage 3: Design Knowledge Generation')
-        design_knowledge = generate_design_knowledge(design_plan, user_input)
-
-        # Prepare context for enhancements
-        design_context = f"""Design Plan:\n{design_plan}\n\nDesign Knowledge and Best Practices:\n{design_knowledge}\n\nOriginal Request:\n{user_input}"""
-
-        # Stage 4: Pre-Enhancement Phase
-        logger.info('Stage 4: Pre-Enhancement Phase')
-        logger.info('Pre-enhancing prompt with design context...')
-        logger.info(f'Using model: {PRE_ENHANCER_MODEL}')
-        pre_enhanced_prompt = pre_enhance_prompt(design_context)
-        logger.info('Pre-enhanced prompt generated')
-
-        # Stage 5: Final Enhancement Phase
-        logger.info('Stage 5: Final Enhancement Phase')
-        logger.info('Enhancing prompt with technical specifications...')
-        logger.info(f'Using model: {PROMPT_ENHANCER_MODEL}')
-        enhanced_prompt = enhance_prompt_with_chat(pre_enhanced_prompt)
+        # Optimized Prompt Enhancement
+        logger.info('Optimized Prompt Enhancement for GPT Image-1')
+        enhanced_prompt = enhance_prompt_for_gpt_image(user_input)
         logger.info('Enhanced prompt generated')
 
         # Create unified session for parallel pipeline BEFORE image generation
         parallel_session_id = f"parallel_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
         logger.info(f'Created parallel session: {parallel_session_id}')
         
-        # Build advanced image prompt optimized for parallel SVG processing
-        image_prompt = build_advanced_image_prompt(enhanced_prompt, design_context)
-
         # Stage 6: Image Generation via GPT-Image using enhanced prompt
         logger.info('Stage 6: Image Generation via GPT-Image with enhanced prompt')
-        logger.debug(f'Image prompt: {image_prompt[:200]}...')
-        image_base64, temp_image_filename, initial_public_url = generate_image_with_gpt(image_prompt, design_context)
+        logger.debug(f'Enhanced prompt: {enhanced_prompt[:200]}...')
+        image_base64, temp_image_filename, initial_public_url = generate_image_with_gpt(enhanced_prompt, None)
         image_data = base64.b64decode(image_base64)
         
         # Save the initial generated image to unified storage immediately
@@ -1997,6 +1618,45 @@ def generate_parallel_svg():
         # Final combined SVG URL
         combined_svg_url = f"{base_url}/{parallel_session_id}/{combined_svg_filename}"
 
+        # Add AI-based SVG correction step
+        force_svg_fix = data.get('force_svg_fix', False)
+        svg_fixed = False
+        max_svg_fix_attempts = 2
+        svg_fix_attempts = 0
+        elements_svg_code_fixed = elements_svg_code
+        while svg_fix_attempts < max_svg_fix_attempts:
+            # Heuristic: If force_svg_fix is set, or SVG is too small/empty, or user wants retry
+            if force_svg_fix or len(elements_svg_code_fixed) < 500 or '<path' not in elements_svg_code_fixed:
+                logger.info(f"Attempting AI-based SVG correction (attempt {svg_fix_attempts+1})...")
+                elements_svg_code_fixed = ai_fix_svg_with_png(elements_svg_code_fixed, edited_png_public_url, user_input)
+                svg_fix_attempts += 1
+                # If SVG is now much larger and contains paths, break
+                if len(elements_svg_code_fixed) > 500 and '<path' in elements_svg_code_fixed:
+                    svg_fixed = True
+                    break
+            else:
+                break
+        # If still not usable, try to regenerate from scratch (fallback)
+        if not svg_fixed and (force_svg_fix or len(elements_svg_code_fixed) < 500 or '<path' not in elements_svg_code_fixed):
+            logger.warning("SVG still not usable after AI fix, regenerating elements SVG from scratch...")
+            # Regenerate using process_clean_svg again
+            elements_svg_code_fixed, elements_svg_path, edited_png_path = process_clean_svg(image_data)
+            # Save new SVG and PNG
+            _, elements_svg_relative_path, _ = save_svg(elements_svg_code_fixed, prefix="elements_svg_regen", session_id=parallel_session_id)
+            with open(edited_png_path, 'rb') as f:
+                edited_png_data = f.read()
+            edited_png_base64 = base64.b64encode(edited_png_data).decode('utf-8')
+            _, edited_png_relative_path, _ = save_image(edited_png_base64, prefix="elements_png_regen", format="PNG", session_id=parallel_session_id)
+            elements_svg_public_url = get_public_image_url(f"sessions/{parallel_session_id}/{os.path.basename(elements_svg_relative_path)}")
+            edited_png_public_url = get_public_image_url(f"sessions/{parallel_session_id}/{os.path.basename(edited_png_relative_path)}")
+        else:
+            # Save the fixed SVG if it was changed
+            if svg_fixed:
+                _, elements_svg_relative_path, _ = save_svg(elements_svg_code_fixed, prefix="elements_svg_fixed", session_id=parallel_session_id)
+                elements_svg_public_url = get_public_image_url(f"sessions/{parallel_session_id}/{os.path.basename(elements_svg_relative_path)}")
+        # Use elements_svg_code_fixed for all downstream steps
+        elements_svg_code = elements_svg_code_fixed
+
         return jsonify({
             'original_prompt': user_input,
             'initial_image': {
@@ -2067,7 +1727,7 @@ def process_image_with_gpt_image(image_url, session_id):
             "prompt": removal_prompt,
             "image": image_url,
             "size": "1024x1024",
-            "quality": "standard",
+            "quality": "low",
             "n": 1
         }
         
@@ -2151,15 +1811,15 @@ def convert_clean_image_to_svg(image_path, session_id):
             output_path=svg_path,
             colormode='color',
             hierarchical='stacked',
-            mode='spline',
-            filter_speckle=4,
-            color_precision=6,
-            layer_difference=16,
-            corner_threshold=60,
-            length_threshold=4.0,
-            max_iterations=10,
-            splice_threshold=45,
-            path_precision=3
+            mode='polygon',              # Use polygon mode for smoother, simpler shapes
+            filter_speckle=16,           # Remove even more small artifacts
+            color_precision=1,           # Merge all similar colors
+            layer_difference=64,        # Merge all similar color layers
+            corner_threshold=120,        # Only keep very sharp corners
+            length_threshold=16.0,       # Ignore small paths
+            max_iterations=2,            # Less detail, more smoothing
+            splice_threshold=90,         # Merge curves aggressively
+            path_precision=0             # Maximum smoothing
         )
         
         if not os.path.exists(svg_path):
@@ -2267,25 +1927,66 @@ def test_enhancement():
         
         logger.info(f"Testing enhancement pipeline with: {user_input}")
         
-        # Stage 1: Pre-enhancement (detailed format)
-        pre_enhanced = pre_enhance_prompt(user_input)
-        
-        # Stage 2: SVG technical enhancement  
-        svg_enhanced = enhance_prompt_with_chat(pre_enhanced)
-        
-        # Stage 3: GPT Image-1 optimization
-        image_enhanced = enhance_prompt_for_gpt_image(pre_enhanced)
+        # Optimized GPT Image-1 enhancement
+        image_enhanced = enhance_prompt_for_gpt_image(user_input)
         
         return jsonify({
             "original": user_input,
-            "pre_enhanced": pre_enhanced,
-            "svg_enhanced": svg_enhanced,
             "image_enhanced": image_enhanced,
             "status": "success"
         })
         
     except Exception as e:
         logger.error(f"Error in test enhancement: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/test-vtracer', methods=['POST'])
+def test_vtracer():
+    """Test endpoint to validate VTracer functionality with improved settings"""
+    try:
+        data = request.json or {}
+        image_base64 = data.get('image_base64', '')
+        use_gradient_preprocessing = data.get('use_gradient_preprocessing', True)
+        
+        if not image_base64:
+            return jsonify({"error": "No image data provided"}), 400
+        
+        if not VTRACER_AVAILABLE:
+            return jsonify({"error": "VTracer not available"}), 500
+        
+        logger.info(f"Testing VTracer with improved settings...")
+        logger.info(f"Gradient preprocessing: {use_gradient_preprocessing}")
+        
+        # Test VTracer with improved settings
+        try:
+            svg_code = generate_svg_from_image(
+                image_base64, 
+                "Test VTracer conversion", 
+                use_preprocessing=use_gradient_preprocessing
+            )
+            
+            return jsonify({
+                "success": True,
+                "svg_code": svg_code,
+                "message": "VTracer conversion completed successfully",
+                "settings_used": {
+                    "mode": "spline",
+                    "color_precision": 6,
+                    "layer_difference": 16,
+                    "filter_speckle": 4,
+                    "gradient_preprocessing": use_gradient_preprocessing
+                }
+            })
+            
+        except Exception as e:
+            return jsonify({
+                "success": False,
+                "error": str(e),
+                "message": "VTracer conversion failed"
+            }), 500
+        
+    except Exception as e:
+        logger.error(f"Error in VTracer test: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 # Add caching for OpenAI responses
@@ -2411,7 +2112,7 @@ def optimized_openai_call(system_prompt, user_prompt, model="gpt-4o-mini", max_t
         # Log performance
         log_api_performance(api_response_time, success=True)
         
-        logger.info(f"✅ OPTIMIZED OpenAI API response in {api_response_time:.2f}s (was {original_prompt_size} chars)")
+        logger.info(f"[SUCCESS] OPTIMIZED OpenAI API response in {api_response_time:.2f}s (was {original_prompt_size} chars)")
 
         if response.status_code != 200:
             logger.error(f"OpenAI API error: {response.status_code} - {response.text}")
@@ -2426,7 +2127,7 @@ def optimized_openai_call(system_prompt, user_prompt, model="gpt-4o-mini", max_t
     except Exception as e:
         api_response_time = time.time() - start_time
         log_api_performance(api_response_time, success=False)
-        logger.error(f"❌ Error in optimized OpenAI call after {api_response_time:.2f}s: {str(e)}")
+        logger.error(f"[ERROR] Error in optimized OpenAI call after {api_response_time:.2f}s: {str(e)}")
         return None
 
 # Add endpoint to check API performance stats
@@ -2520,7 +2221,7 @@ if not OPENROUTER_API_KEY:
     logger.warning("   Get your key at: https://openrouter.ai/")
     logger.warning("   Will fall back to OpenAI API for SVG operations")
 else:
-    logger.info("✅ OpenRouter API key found - Google Gemini-2.5-flash enabled for ultra-fast SVG processing!")
+    logger.info("[SUCCESS] OpenRouter API key found - Google Gemini-2.5-flash enabled for ultra-fast SVG processing!")
 
 # OpenRouter client for SVG operations
 openrouter_client = None
@@ -2579,7 +2280,7 @@ def optimized_openrouter_call(system_prompt, user_prompt, model="google/gemini-2
         # Log performance
         log_api_performance(api_response_time, success=True)
         
-        logger.info(f"✅ OPTIMIZED OpenRouter API response in {api_response_time:.2f}s (was {original_prompt_size} chars)")
+        logger.info(f"[SUCCESS] OPTIMIZED OpenRouter API response in {api_response_time:.2f}s (was {original_prompt_size} chars)")
 
         ai_response = completion.choices[0].message.content
         return ai_response.strip()
@@ -2587,7 +2288,7 @@ def optimized_openrouter_call(system_prompt, user_prompt, model="google/gemini-2
     except Exception as e:
         api_response_time = time.time() - start_time
         log_api_performance(api_response_time, success=False)
-        logger.error(f"❌ Error in optimized OpenRouter call after {api_response_time:.2f}s: {str(e)}")
+        logger.error(f"[ERROR] Error in optimized OpenRouter call after {api_response_time:.2f}s: {str(e)}")
         return None
 
 def ai_combine_svgs(text_svg_code, elements_svg_code, background_image_url=None):
@@ -2742,7 +2443,7 @@ def post_process_svg_remove_first_path(svg_code):
         user_prompt=user_prompt,
         model="google/gemini-2.5-flash",  # Google Gemini model
         max_tokens=6000,                  # Reduced tokens
-        temperature=0.1                   # More deterministic
+        temperature=1               # More deterministic
     )
     
     if ai_response:
@@ -2751,6 +2452,46 @@ def post_process_svg_remove_first_path(svg_code):
     else:
         logger.info("Gemini post-processing failed, returning original SVG")
         return svg_code
+
+def ai_fix_svg_with_png(elements_svg_code, elements_png_url, prompt=None):
+    """Use an AI model to fix the SVG so it matches the PNG as closely as possible, including element and text positions and sizes."""
+    logger.info("Starting AI-based SVG correction using PNG reference...")
+    # Use OpenAI or Gemini vision model to compare and fix SVG
+    # We'll use the PNG public URL and SVG code as input
+    system_prompt = (
+        "You are an expert SVG repair assistant. "
+        "Given an SVG code and a PNG image (URL), your job is to edit the SVG so it visually matches the PNG as closely as possible. "
+        "Fix missing elements, colors, shapes, text, and details. "
+        "Most importantly, ensure that the position and size of each element and all text in the SVG matches the corresponding element and text in the PNG as closely as possible. "
+        "Do not just match colors and shapes, but also their exact placement, proportions, and text positioning. "
+        "Return ONLY the corrected SVG code."
+    )
+    user_prompt = f"""
+Here is the current SVG code:
+```svg
+{elements_svg_code}
+```
+
+Here is the PNG image (URL):
+{elements_png_url}
+
+{('Original prompt: ' + prompt) if prompt else ''}
+
+Please return the corrected SVG code that matches the PNG as closely as possible, including element and text positions and sizes. Only output SVG code.
+"""
+    # Use OpenRouter Gemini if available, else fallback to OpenAI
+    ai_response = optimized_openrouter_call(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        model="google/gemini-2.5-flash",
+        max_tokens=32000,
+        temperature=0.3
+    )
+    if ai_response and '<svg' in ai_response:
+        logger.info("AI-based SVG correction successful.")
+        return ai_response
+    logger.warning("AI-based SVG correction failed or did not return SVG. Returning original SVG.")
+    return elements_svg_code
 
 if __name__ == '__main__':
     # Get port from environment variable (Render sets PORT=8000)
